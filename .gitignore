@@ -1,0 +1,23 @@
+# Backend
+ChatFlow.API/bin/
+ChatFlow.API/obj/
+ChatFlow.API/out/
+ChatFlow.API/appsettings.Production.json
+
+# Frontend
+chatflow-client/node_modules/
+chatflow-client/dist/
+chatflow-client/.env
+
+# OS / Editor
+.DS_Store
+.vs/
+.idea/
+.vscode/
+
+# SQLite (artık PostgreSQL kullanılıyor)
+*.db
+
+# Lokal yüklenen dosyalar (Cloudinary'ye taşındı)
+ChatFlow-API/wwwroot/img/
+ChatFlow-API/wwwroot/test.html

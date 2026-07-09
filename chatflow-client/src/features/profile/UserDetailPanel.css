@@ -1,0 +1,124 @@
+.user-detail-panel {
+  width: 340px;
+  flex-shrink: 0;
+  background: #f1f5f2;
+  border-left: 1px solid #e3ebe5;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  animation: detail-slide-in 0.28s ease;
+}
+
+@keyframes detail-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.user-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e8e8f0;
+}
+
+.user-detail-title {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+}
+
+/* Geri oku sadece mobilde, çarpı sadece masaüstünde */
+.user-detail-back {
+  display: none;
+}
+
+.user-detail-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px;
+  border-bottom: 1px solid #e8e8f0;
+}
+
+.user-detail-name {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #333 !important;
+  margin-top: 14px !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.user-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.user-detail-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.user-detail-bio {
+  padding: 18px 20px;
+  border-bottom: 1px solid #e8e8f0;
+  font-size: 14px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.user-detail-collapse {
+  background: transparent !important;
+  border: none !important;
+  padding: 8px;
+}
+
+.user-detail-about-box {
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 0;
+}
+
+.user-detail-about-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f2;
+  overflow: hidden;
+}
+
+.user-detail-about-label {
+  font-size: 12px !important;
+  color: var(--color-primary) !important;
+  display: block !important;
+}
+
+.user-detail-about-value {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: block !important;
+}
+
+/* Tablet / mobil: tam ekran ayrı sayfa gibi */
+@media (max-width: 900px) {
+  .user-detail-panel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    z-index: 30;
+    border-left: none;
+  }
+  .user-detail-back {
+    display: inline-block;
+  }
+}

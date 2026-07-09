@@ -1,0 +1,210 @@
+.sidebar-wrapper {
+  display: flex;
+  height: 100vh;
+}
+
+.icon-bar {
+  width: 75px;
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  height: 100vh;
+}
+
+.icon-bar-logo {
+  width: 38px;
+  height: 38px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.icon-bar-middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  margin: 7px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 24px;
+  color: #c8c6d9;
+  transition: all 0.2s;
+  background: transparent;
+}
+
+.icon-btn:hover {
+  color: var(--color-primary);
+}
+
+.icon-btn.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.icon-bar-avatar {
+  cursor: pointer;
+}
+
+.icon-bar-mobile {
+  display: none;
+}
+
+.nav-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 13px;
+  height: 13px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+/* === Masaüstü tooltip (ikonun sağında, tıklayınca) === */
+.desktop-tooltip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1f1f1f;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 6px 14px;
+  border-radius: 8px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  animation: desktop-tooltip-pop 0.15s ease;
+}
+
+/* Sola bakan küçük ok */
+.desktop-tooltip::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #1f1f1f;
+  border-left: none;
+}
+
+@keyframes desktop-tooltip-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* === Mobil tooltip (ikonun üstünde, tıklayınca) === */
+.mobile-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f1f1f;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 400;
+  padding: 6px 16px;
+  border-radius: 8px;
+  white-space: nowrap;
+  z-index: 50;
+  pointer-events: none;
+  animation: tooltip-pop 0.15s ease;
+}
+
+/* Küçük ok (balonun altındaki üçgen) */
+.mobile-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1f1f1f;
+}
+
+@keyframes tooltip-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar-wrapper {
+    flex-direction: column-reverse;
+    width: 100%;
+    height: 100vh;
+  }
+
+  /* Masaüstü bar gizli, mobil bar görünür */
+  .icon-bar-desktop {
+    display: none;
+  }
+
+  /* Masaüstü tooltip mobilde görünmesin */
+  .desktop-tooltip {
+    display: none;
+  }
+
+  .icon-bar-mobile {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 60px;
+    justify-content: space-evenly;
+    align-items: center;
+    padding: 0;
+    border-right: none;
+    border-top: 1px solid #f0f0f0;
+    flex-shrink: 0;
+  }
+
+  .icon-bar-mobile .icon-btn {
+    margin: 0;
+  }
+
+  .icon-bar-mobile .icon-bar-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 13px !important;
+  }
+
+  .sidebar-wrapper > *:not(.icon-bar) {
+    flex: 1;
+    width: auto !important;
+    min-width: 0;
+    height: auto !important;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+}

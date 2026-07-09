@@ -1,0 +1,240 @@
+.chats-panel {
+    width: 380px;
+    padding: 10px;
+    background: #f1f5f2;
+    border-right: 1px solid #e3ebe5;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.chats-panel-header {
+    padding: 20px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #333;
+}
+
+.chats-panel-search {
+    padding: 0 14px 16px;
+}
+
+.chats-panel-search .ant-input-affix-wrapper {
+    border-radius: 8px !important;
+    background: #e3ebe5 !important;
+    border: none !important;
+    height: 38px;
+    font-size: 13px;
+}
+
+.chats-panel-online {
+    padding: 20px 14px 16px;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.chats-panel-online::-webkit-scrollbar {
+    display: none;
+}
+
+.online-user-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    background: #d3ddd5;
+    border-radius: 10px;
+    padding: 0 10px 10px;
+    min-width: 72px;
+    max-width: 72px;
+    position: relative;
+    transition: background 0.3s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+}
+
+.online-user-card:hover {
+    background: #dee7e1;
+}
+
+.online-user-avatar-wrapper {
+    position: relative;
+    margin-top: -18px;
+}
+
+.online-user-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #52c41a;
+    border: 2px solid #fff;
+}
+
+.chats-panel-recent-title {
+    padding: 20px 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #000000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chats-panel-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.chats-panel-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    cursor: pointer;
+    gap: 12px;
+    border-left: 3px solid transparent;
+    transition: background 0.2s;
+}
+
+.chats-panel-item:hover {
+    background: #e3ebe5;
+}
+
+.chats-panel-item.active {
+    background: #e3ebe5;
+    border-left: 3px solid var(--color-primary);
+}
+
+.chats-panel-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.chats-panel-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chats-panel-item-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.chats-panel-item-last-msg {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.online-user-name {
+    font-size: 12px;
+    color: #555;
+    font-weight: 500;
+    margin-top: 6px;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chats-panel-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+/* Okunmamış mesaj işareti (WhatsApp tarzı yeşil nokta) */
+.chats-unread-dot {
+  width: 12px;
+  height: 12px;
+  background: #52c41a;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+
+/* Okunmamış mesaj sayı rozeti (WhatsApp tarzı) */
+.chats-unread-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: #52c41a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+ 
+
+/* Masaüstü: sohbet satırında 3 nokta (hover'da görünür) */
+.chats-item-more {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.chats-panel-item:hover .chats-item-more {
+  opacity: 1;
+}
+
+/* Long-press seçili satır */
+.chats-panel-item.long-pressed {
+  background: #e3ebe5;
+}
+
+/* Mobil long-press menüsü */
+.chats-longpress-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 8px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 6px;
+  z-index: 1001;
+  min-width: 160px;
+}
+
+.chats-longpress-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.chats-longpress-item:hover {
+  background: #f5f5f5;
+}
+
+.chats-longpress-item.danger {
+  color: #ff4d4f;
+}
+
+@media (max-width: 900px) {
+  /* Mobilde 3 nokta gizli (long-press kullanılıyor) */
+  .chats-item-more {
+    display: none !important;
+  }
+}

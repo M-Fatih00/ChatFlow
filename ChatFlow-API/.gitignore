@@ -1,0 +1,23 @@
+cat > .gitignore << 'EOF'
+# Build klasörleri
+bin/
+obj/
+out/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+# Ortam / secret dosyaları
+appsettings.Production.json
+*.env
+
+# Loglar
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+EOF

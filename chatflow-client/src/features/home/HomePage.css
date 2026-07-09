@@ -1,0 +1,34 @@
+.home-wrapper {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.home-sidebar {
+  display: flex;
+}
+
+.home-chat {
+  flex: 1;
+  display: flex;
+}
+
+/* Tablet / telefon */
+@media (max-width: 900px) {
+  /* Sohbet seçili DEĞİL → liste tam ekran, sohbet gizli */
+  .home-wrapper.no-chat .home-chat {
+    display: none;
+  }
+  .home-wrapper.no-chat .home-sidebar {
+    width: 100%;
+  }
+
+  /* Sohbet seçili → sohbet tam ekran, liste gizli */
+  .home-wrapper.chat-active .home-sidebar {
+    display: none;
+  }
+  .home-wrapper.chat-active .home-chat {
+    display: flex;
+    width: 100%;
+  }
+}

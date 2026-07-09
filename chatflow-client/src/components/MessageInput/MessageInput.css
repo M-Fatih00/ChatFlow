@@ -1,0 +1,218 @@
+.message-input-wrapper {
+    padding: 12px 20px;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.message-input-wrapper .ant-input {
+    border-radius: 20px;
+    background: #f4f4f5;
+    border: 1px solid #f0f0f0;
+    height: 44px;
+    font-size: 14px;
+}
+
+.message-input-icon {
+    font-size: 22px;
+    color: #aaa;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.message-input-icon:hover {
+    color: var(--color-primary);
+}
+
+.message-input-send-btn {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    width: 44px !important;
+    height: 44px !important;
+    flex-shrink: 0;
+}
+
+.message-input-send-btn:hover {
+    background: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+}
+
+.message-input-wrapper .ant-input-affix-wrapper,
+.message-input-wrapper .ant-input {
+    flex: 1;
+    border-radius: 20px;
+    background: #f4f4f5;
+    border: 1px solid #f0f0f0;
+    height: 44px;
+    font-size: 14px;
+}
+
+
+/* === Ek (attachment) önizleme === */
+.attachment-preview-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 65px;
+}
+
+.attachment-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    max-width: 320px;
+    background: #f1f5f2;
+    border-radius: 8px;
+    border: 1px solid #e3ebe5;
+}
+
+.attachment-preview-img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.attachment-preview-file-icon {
+    font-size: 24px;
+    color: var(--color-primary);
+}
+
+.attachment-preview-name {
+    flex: 1;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-preview-close {
+    cursor: pointer;
+    color: #aaa;
+}
+
+
+/* === Ataç menüsü (input üstünde açılan) === */
+.attach-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 12px;
+  margin-bottom: 8px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 50;
+  min-width: 160px;
+  animation: attach-pop 0.15s ease;
+}
+
+@keyframes attach-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.attach-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+  color: #333;
+}
+
+.attach-menu-item:hover {
+  background: #f1f5f2;
+}
+
+.attach-menu-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+
+/* === Emoji picker konum + boyut === */
+.emoji-picker-container {
+  position: absolute;
+  bottom: 100%;
+  right: 12px;
+  margin-bottom: 8px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  border-radius: 12px;
+}
+
+/*
+  Emoji boyutu: aside.EmojiPickerReact yüksek spesifiklik sağlar
+  (kütüphanenin kendi kurallarını ezer). --epr-emoji-size görünen boyut,
+  --epr-emoji-fullsize buton alanıdır; native modda ikisi birlikte çalışır.
+*/
+.emoji-picker-container aside.EmojiPickerReact {
+  --epr-emoji-size: 32px;
+  --epr-emoji-fullsize: 40px;
+  --epr-emoji-gap: 8px;
+  border: none !important;
+}
+
+/* Kapatma butonu (picker üstünde) */
+.emoji-picker-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 60;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.emoji-picker-close:hover {
+  background: #f0f0f0;
+}
+
+
+/* === Mobil === */
+@media (max-width: 900px) {
+  .emoji-picker-container {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+    max-height: 36vh;
+  }
+  .emoji-picker-container aside.EmojiPickerReact {
+    --epr-emoji-size: 34px;
+    --epr-emoji-fullsize: 42px;
+    height: 36vh !important;
+  }
+}

@@ -140,10 +140,13 @@ app.UseCors(opt =>
     opt.AllowAnyHeader()
        .AllowAnyMethod()
        .AllowCredentials()
-       .WithOrigins(
-           "http://localhost:5173",
-           builder.Configuration["ClientUrl"] ?? "http://localhost:5173"
-       );
+       .SetIsOriginAllowed(origin =>
+       {
+           if (origin == "http://localhost:5173") return true;
+           if (origin.EndsWith(".vercel.app")) return true;
+           var clientUrl = builder.Configuration["ClientUrl"];
+           return !string.IsNullOrEmpty(clientUrl) && origin == clientUrl;
+       });
 });
 
 app.UseAuthentication();

@@ -6,6 +6,7 @@ using ChatFlow.API.Models.Entities;
 using ChatFlow.API.Service;
 using ChatFlow.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -23,6 +24,14 @@ builder.Services.AddIdentity<User, IdentityRole>()
     .AddDefaultTokenProviders();
 
 builder.Services.AddAuthorization();
+
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.Configure<IdentityOptions>(options =>
 {
@@ -93,7 +102,6 @@ builder.Services.AddScoped<IMessageService, MessageService>();
 
 builder.Services.AddSingleton<CloudinaryService>();
 
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(option =>
 {
@@ -102,17 +110,30 @@ builder.Services.AddSwaggerGen(option =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Proxy header'ları 
+app.UseForwardedHeaders();
+
+// Bekleyen migration'ları uygula 
+using (var scope = app.Services.CreateScope())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ChatFlow API v1");
-    });
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
 }
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "ChatFlow API v1");
+});
 
 app.UseStaticFiles();
 app.UseRouting();
+
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.None,
+    Secure = CookieSecurePolicy.Always
+});
 
 app.UseCors(opt =>
 {

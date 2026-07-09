@@ -25,7 +25,6 @@ builder.Services.AddIdentity<User, IdentityRole>()
 
 builder.Services.AddAuthorization();
 
-
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -71,7 +70,6 @@ builder.Services.AddAuthentication(options =>
     {
         OnMessageReceived = context =>
         {
-            // SignalR WebSocket token query string'den gelir
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
@@ -80,7 +78,6 @@ builder.Services.AddAuthentication(options =>
                 return Task.CompletedTask;
             }
 
-            // Header'dan al (Swagger için)
             var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
             if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
             {
@@ -88,7 +85,6 @@ builder.Services.AddAuthentication(options =>
                 return Task.CompletedTask;
             }
 
-            // Cookie'den al (frontend için)
             context.Token = context.Request.Cookies["jwt"];
             return Task.CompletedTask;
         }
@@ -110,10 +106,10 @@ builder.Services.AddSwaggerGen(option =>
 
 var app = builder.Build();
 
-// Proxy header'ları 
+// Proxy header'ları (Render arkasında HTTPS doğru algılansın)
 app.UseForwardedHeaders();
 
-// Bekleyen migration'ları uygula 
+// Bekleyen migration'ları uygula
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -126,33 +122,19 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "ChatFlow API v1");
 });
 
+// Frontend (wwwroot) static dosyalarını sun
+app.UseDefaultFiles();
 app.UseStaticFiles();
+
 app.UseRouting();
-
-app.UseCookiePolicy(new CookiePolicyOptions
-{
-    MinimumSameSitePolicy = SameSiteMode.None,
-    Secure = CookieSecurePolicy.Always
-});
-
-app.UseCors(opt =>
-{
-    opt.AllowAnyHeader()
-       .AllowAnyMethod()
-       .AllowCredentials()
-       .SetIsOriginAllowed(origin =>
-       {
-           if (origin == "http://localhost:5173") return true;
-           if (origin.EndsWith(".vercel.app")) return true;
-           var clientUrl = builder.Configuration["ClientUrl"];
-           return !string.IsNullOrEmpty(clientUrl) && origin == clientUrl;
-       });
-});
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
 
+app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+
+// React SPA fallback: API/hub dışındaki tüm route'lar index.html'e
+app.MapFallbackToFile("index.html");
 
 app.Run();

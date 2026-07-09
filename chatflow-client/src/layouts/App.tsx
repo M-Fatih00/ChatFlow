@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from "../store/store";
 import { getMe } from "../features/auth/authSlice";
 import { signalRService } from "../api/signalRService";
 import { message } from "antd";
-import "../Index.css";
+import "../index.css";
 import { clearActiveConversation } from "../features/chats/chatSlice";
 
 function App() {

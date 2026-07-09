@@ -21,8 +21,11 @@ class SignalRService {
   async connect(token: string) {
     if (this.connection) return; // zaten bağlantı varsa tekrar kurma
 
+    const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5017/api";
+    const hubUrl = apiBase.replace(/\/api\/?$/, "") + "/hubs/chat";
+
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("http://localhost:5017/hubs/chat", {
+      .withUrl(hubUrl, {
         accessTokenFactory: () => token,
       })
       .withAutomaticReconnect()

@@ -21,7 +21,8 @@ class SignalRService {
   async connect(token: string) {
     if (this.connection) return; // zaten bağlantı varsa tekrar kurma
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5017/api";
+    const apiBase =
+      import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5017/api";
     const hubUrl = apiBase.replace(/\/api\/?$/, "") + "/hubs/chat";
 
     const connection = new signalR.HubConnectionBuilder()
@@ -148,10 +149,12 @@ class SignalRService {
       );
     });
 
-    this.connection.on("AddedToRoom", (roomId: number) => {
+    this.connection.on("AddedToRoom", async (roomId: number) => {
+      // SignalR grubuna ANINDA katıl (hangi panelde olursak olalım)
+      await this.joinRoom(roomId);
+      // Panellerin listeyi yenilemesi için event de fırlat
       window.dispatchEvent(new CustomEvent("addedToRoom", { detail: roomId }));
     });
-
     this.connection.on("OnlineUsersList", (userIds: string[]) => {
       userIds.forEach((id) => store.dispatch(userOnline(id)));
     });

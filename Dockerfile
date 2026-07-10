@@ -17,10 +17,10 @@ RUN npm run build
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend
 WORKDIR /src
 
-COPY ChatFlow.API/ChatFlow.API.csproj ./
+COPY ChatFlow-API/ChatFlow.API.csproj ./
 RUN dotnet restore ChatFlow.API.csproj
 
-COPY ChatFlow.API/ ./
+COPY ChatFlow-API/ ./
 RUN dotnet publish ChatFlow.API.csproj -c Release -o /app/publish
 
 # ==== 3) Runtime ====

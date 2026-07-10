@@ -634,6 +634,7 @@ export default function ChatArea() {
           }}
           style={{
             flex: 1,
+            minHeight: 0,
             overflowY: "auto",
             padding: "24px",
             background: "#fff",

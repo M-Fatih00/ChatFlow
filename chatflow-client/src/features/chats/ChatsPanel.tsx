@@ -1,5 +1,17 @@
-import { Avatar, Input, Badge, Typography, Dropdown, Modal, message as antdMessage } from "antd";
-import { SearchOutlined, MoreOutlined, DeleteOutlined } from "@ant-design/icons";
+import {
+  Avatar,
+  Input,
+  Badge,
+  Typography,
+  Dropdown,
+  Modal,
+  message as antdMessage,
+} from "antd";
+import {
+  SearchOutlined,
+  MoreOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import "./ChatsPanel.css";
 import { useEffect, useState, useRef } from "react";
 import type { IUser } from "../../models/IUser";
@@ -60,6 +72,9 @@ export default function ChatsPanel() {
     const handler = (e: Event) => {
       const { userId, avatar } = (e as CustomEvent).detail;
       setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, avatar } : u)),
+      );
+      setFriends((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, avatar } : u)),
       );
     };
@@ -215,7 +230,10 @@ export default function ChatsPanel() {
                 style={{ position: "relative" }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (longPressUser) { setLongPressUser(null); return; }
+                  if (longPressUser) {
+                    setLongPressUser(null);
+                    return;
+                  }
                   if (activeConversationId !== u.id) {
                     navigate(`/chat/${u.id}`);
                   }
@@ -298,7 +316,9 @@ export default function ChatsPanel() {
                       ],
                     }}
                   >
-                    <MoreOutlined style={{ fontSize: 16, color: "#aaa", padding: 4 }} />
+                    <MoreOutlined
+                      style={{ fontSize: 16, color: "#aaa", padding: 4 }}
+                    />
                   </Dropdown>
                 </div>
 

@@ -273,7 +273,7 @@ export default function ChatArea() {
     const isMyMessage = lastMessage?.senderId === currentUser?.id;
 
     if (isMyMessage) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      container.scrollTop = container.scrollHeight;
       setHasNewMessage(false);
       return;
     }
@@ -283,7 +283,7 @@ export default function ChatArea() {
     const isNearBottom = distance < 150;
 
     if (isNearBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      container.scrollTop = container.scrollHeight;
       setHasNewMessage(false);
     } else {
       setHasNewMessage(true);
@@ -342,7 +342,8 @@ export default function ChatArea() {
   }, [isRoom, activeRoom]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
     setHasNewMessage(false);
   };
 

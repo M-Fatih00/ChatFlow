@@ -26,6 +26,7 @@ export default function MessageInput() {
   );
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+  const inputRef = useRef<any>(null);
 
   // İki ayrı gizli file input: resim ve genel dosya
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +96,7 @@ export default function MessageInput() {
     setContent("");
     setAttachment(null);
     setEmojiOpen(false);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -226,6 +228,7 @@ export default function MessageInput() {
         />
 
         <Input
+          ref={inputRef}
           placeholder="Enter Message..."
           size="large"
           value={content}

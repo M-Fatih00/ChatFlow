@@ -43,6 +43,7 @@ export default function ChatArea() {
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const navigate = useNavigate();
   const isPrependingRef = useRef(false);
+  const wasNearBottomRef = useRef(true);
 
   // Engelleme durumu
   const [iBlocked, setIBlocked] = useState(false);
@@ -278,11 +279,8 @@ export default function ChatArea() {
       return;
     }
 
-    const distance =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isNearBottom = distance < 150;
-
-    if (isNearBottom) {
+    // Karşı taraf mesajı: mesaj GELMEDEN ÖNCE en altta mıydık?
+    if (wasNearBottomRef.current) {
       container.scrollTop = container.scrollHeight;
       setHasNewMessage(false);
     } else {
@@ -298,6 +296,7 @@ export default function ChatArea() {
       const distance =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       const isNearBottom = distance < 150;
+      wasNearBottomRef.current = isNearBottom; 
       setShowScrollButton(!isNearBottom);
       if (isNearBottom) setHasNewMessage(false);
 

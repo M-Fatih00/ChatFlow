@@ -23,6 +23,7 @@ import type { IRoom } from "../../models/IRoom";
 import type { IUser } from "../../models/IUser";
 import "./GroupsPanel.css";
 import { avatarUrl } from "../../utils/avatarUrl";
+import { signalRService } from "../../api/signalRService";
 
 const { Text } = Typography;
 
@@ -59,12 +60,19 @@ export default function GroupsPanel() {
       fetchRooms();
     };
 
+    // Yeni gruba eklenince: hem listeyi yenile hem SignalR grubuna katıl
+    const handleAddedToRoom = (e: Event) => {
+      const roomId = (e as CustomEvent).detail;
+      signalRService.joinRoom(roomId); // anında gruba katıl (mesaj alabilmek için)
+      fetchRooms();
+    };
+
     window.addEventListener("removedFromRoom", handleRoomUpdate);
-    window.addEventListener("addedToRoom", handleRoomUpdate);
+    window.addEventListener("addedToRoom", handleAddedToRoom);
     window.addEventListener("roomUpdated", handleRoomUpdate);
     return () => {
       window.removeEventListener("removedFromRoom", handleRoomUpdate);
-      window.removeEventListener("addedToRoom", handleRoomUpdate);
+      window.removeEventListener("addedToRoom", handleAddedToRoom);
       window.removeEventListener("roomUpdated", handleRoomUpdate);
     };
   }, []);
@@ -152,8 +160,7 @@ export default function GroupsPanel() {
   const unreadCount = (roomId: number) => unreadCounts[String(roomId)] || 0;
 
   return (
-    <div
-      className="groups-panel">
+    <div className="groups-panel">
       <div className="groups-panel-header">
         <Text className="groups-panel-header-title">Groups</Text>
         <UserAddOutlined

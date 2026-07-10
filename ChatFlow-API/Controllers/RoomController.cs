@@ -108,6 +108,13 @@ public class RoomController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // Üyelere "yeni gruba eklendin" bildirimi gönder (grubu kuran hariç)
+        foreach (var memberId in memberIds)
+        {
+            if (memberId == userId) continue; // grubu kuran hariç
+            await _hubContext.Clients.User(memberId).SendAsync("AddedToRoom", room.Id);
+        }
+
         return Ok(new RoomDTO
         {
             Id = room.Id,
@@ -357,8 +364,8 @@ public class RoomController : ControllerBase
             return BadRequest(new { message = "Sadece jpg, png, webp dosyaları kabul edilir." });
 
         var url = await _cloudinaryService.UploadImageAsync(file, "rooms");
-        
-        if(url == null)
+
+        if (url == null)
             return BadRequest(new { message = "Fotoğraf yüklenemedi." });
 
         room.Avatar = url;

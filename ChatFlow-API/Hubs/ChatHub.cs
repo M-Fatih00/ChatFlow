@@ -15,6 +15,10 @@ public class ChatHub : Hub
     private readonly UserManager<User> _userManager;
     private readonly AppDbContext _context;
     private readonly IMessageService _messageService;
+    
+    // Kullanıcı başına aktif bağlantı sayısı (sayfa yenileme/çoklu sekme için)
+    private static readonly Dictionary<string, int> _connections = new();
+    private static readonly object _lock = new();
     public ChatHub(UserManager<User> userManager, AppDbContext context, IMessageService messageService)
     {
         _userManager = userManager;
@@ -88,11 +92,30 @@ public class ChatHub : Hub
 
         if (user == null) return;
 
-        user.IsOnline = true;
-        await _userManager.UpdateAsync(user);
-        await Clients.Others.SendAsync("UserOnline", user.Id);
+        bool isFirstConnection;
+        lock (_lock)
+        {
+            if (_connections.ContainsKey(userId!))
+            {
+                _connections[userId!]++;
+                isFirstConnection = false;
+            }
+            else
+            {
+                _connections[userId!] = 1;
+                isFirstConnection = true;
+            }
+        }
 
-        // Üye olduğu tüm gruplara otomatik katıl (arka planda mesaj alabilsin)
+        // Sadece ilk bağlantıda online yap ve bildir
+        if (isFirstConnection)
+        {
+            user.IsOnline = true;
+            await _userManager.UpdateAsync(user);
+            await Clients.Others.SendAsync("UserOnline", user.Id);
+        }
+
+        // Üye olduğu tüm gruplara katıl
         var roomIds = await _context.RoomMembers
             .Where(rm => rm.UserId == userId)
             .Select(rm => rm.RoomId)
@@ -113,11 +136,28 @@ public class ChatHub : Hub
 
         if (user == null) return;
 
-        user.IsOnline = false;
-        user.LastSeen = DateTime.UtcNow;
+        bool isLastConnection = false;
+        lock (_lock)
+        {
+            if (_connections.ContainsKey(userId!))
+            {
+                _connections[userId!]--;
+                if (_connections[userId!] <= 0)
+                {
+                    _connections.Remove(userId!);
+                    isLastConnection = true;
+                }
+            }
+        }
 
-        await _userManager.UpdateAsync(user);
-        await Clients.Others.SendAsync("UserOffline", user.Id);
+        // Sadece son bağlantı koptuğunda offline yap
+        if (isLastConnection)
+        {
+            user.IsOnline = false;
+            user.LastSeen = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+            await Clients.Others.SendAsync("UserOffline", user.Id);
+        }
 
         await base.OnDisconnectedAsync(exception);
     }

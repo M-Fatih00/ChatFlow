@@ -13,9 +13,10 @@ import {
   SearchOutlined,
   StopOutlined,
   UserOutlined,
+  LogoutOutlined
 } from "@ant-design/icons";
 import { useAppSelector, useAppDispatch } from "../../store/store";
-import { updateAvatar, updateProfile } from "../../features/auth/authSlice";
+import { updateAvatar, updateProfile, logoutUser } from "../../features/auth/authSlice";
 import agent from "../../api/requests";
 import { useRef, useState, useEffect } from "react";
 import { avatarUrl } from "../../utils/avatarUrl";
@@ -168,6 +169,17 @@ export default function SettingsPanel() {
     } finally {
       setChangingPassword(false);
     }
+  };
+
+  const confirmLogout = () => {
+    Modal.confirm({
+      title: "Çıkış Yap",
+      content: "Çıkış yapmak istediğinize emin misiniz?",
+      okText: "Çıkış Yap",
+      okType: "danger",
+      cancelText: "İptal",
+      onOk: () => dispatch(logoutUser()),
+    });
   };
 
   return (
@@ -487,6 +499,18 @@ export default function SettingsPanel() {
           />
         </div>
       </Modal>
+      {/* Çıkış (özellikle mobilde) */}
+      <div className="settings-logout-section">
+        <Button
+          danger
+          block
+          icon={<LogoutOutlined />}
+          onClick={confirmLogout}
+          className="settings-logout-btn"
+        >
+          Çıkış Yap
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Avatar, Dropdown } from "antd";
+import { Avatar, Dropdown, Modal } from "antd";
 import {
   UserOutlined,
   MessageOutlined,
@@ -70,28 +70,29 @@ export default function Sidebar() {
     settings: "Settings",
   };
 
-  // Panel değiştir + noktayı söndür + masaüstünde aktif sohbeti kapat
-  // const changePanel = (key: PanelType) => {
-  //   setActivePanel(key);
-  //   if (key === "contacts") setHasNewContact(false);
-  //   if (key === "chats") setHasNewChat(false);
-  //   if (key === "groups") setHasNewGroup(false);
-  //   if (window.innerWidth > 900) {
-  //     dispatch(clearActiveConversation());
-  //     navigate("/");
-  //   }
-  // };
   const changePanel = (key: PanelType) => {
-  setActivePanel(key);
-  if (key === "contacts") setHasNewContact(false);
-  if (key === "chats") setHasNewChat(false);
-  if (key === "groups") setHasNewGroup(false);
-  // Panele geçince aktif sohbeti her zaman temizle (unread doğru çalışsın)
-  dispatch(clearActiveConversation());
-  if (window.innerWidth > 900) {
-    navigate("/");
-  }
-};
+    setActivePanel(key);
+    if (key === "contacts") setHasNewContact(false);
+    if (key === "chats") setHasNewChat(false);
+    if (key === "groups") setHasNewGroup(false);
+    // Panele geçince aktif sohbeti her zaman temizle (unread doğru çalışsın)
+    dispatch(clearActiveConversation());
+    if (window.innerWidth > 900) {
+      navigate("/");
+    }
+  };
+
+  // Çıkış onayı
+  const confirmLogout = () => {
+    Modal.confirm({
+      title: "Çıkış Yap",
+      content: "Çıkış yapmak istediğinize emin misiniz?",
+      okText: "Çıkış Yap",
+      okType: "danger",
+      cancelText: "İptal",
+      onOk: () => dispatch(logoutUser()),
+    });
+  };
 
   // Contacts noktası: bekleyen arkadaşlık isteği var mı?
   useEffect(() => {
@@ -133,7 +134,8 @@ export default function Sidebar() {
   return (
     <div className="sidebar-wrapper">
       {(() => {
-        const avatarDropdown = (
+        // Masaüstü avatar menüsü (Profile + Settings + Log out)
+        const desktopAvatarDropdown = (
           <Dropdown
             menu={{
               items: [
@@ -154,7 +156,43 @@ export default function Sidebar() {
                   key: "logout",
                   label: "Log out",
                   icon: <LogoutOutlined />,
-                  onClick: () => dispatch(logoutUser()),
+                  onClick: confirmLogout,
+                },
+              ],
+            }}
+            placement="topRight"
+            trigger={["click"]}
+          >
+            <Avatar
+              src={avatarUrl(user?.avatar)}
+              className="icon-bar-avatar"
+              style={{
+                background: "var(--color-primary)",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {user?.fullName?.charAt(0).toUpperCase() ?? "U"}
+            </Avatar>
+          </Dropdown>
+        );
+
+        // Mobil avatar menüsü (Log out YOK — Settings içine taşındı)
+        const mobileAvatarDropdown = (
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "profile",
+                  label: "Profile",
+                  icon: <IdcardOutlined />,
+                  onClick: () => changePanel("profile"),
+                },
+                {
+                  key: "settings",
+                  label: "Settings",
+                  icon: <SettingOutlined />,
+                  onClick: () => changePanel("settings"),
                 },
               ],
             }}
@@ -209,10 +247,10 @@ export default function Sidebar() {
                 ))}
               </div>
 
-              {avatarDropdown}
+              {desktopAvatarDropdown}
             </div>
 
-            {/* MOBİL ikon bar (sohbet kapatma yok — panel geçişi + tooltip) */}
+            {/* MOBİL ikon bar (Settings ikonu gizli, logout Settings içinde) */}
             <div className="icon-bar icon-bar-mobile">
               {navItems
                 .filter((item) => item.key !== "settings")
@@ -236,7 +274,7 @@ export default function Sidebar() {
                     {dotFor(item.key) && <span className="nav-dot" />}
                   </div>
                 ))}
-              {avatarDropdown}
+              {mobileAvatarDropdown}
             </div>
           </>
         );

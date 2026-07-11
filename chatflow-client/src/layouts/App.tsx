@@ -43,26 +43,27 @@ function App() {
   }, [navigate, dispatch]);
 
   // Geri tuşu: SADECE ana sayfada (/) çıkış onayı sor.
-  // Bu effect her path değişiminde yeniden kurulur; closure'daki `isOnHome`
-  // o anki path'i taze tutar (ref/timing sorunu yok).
+  // Sohbet sayfasında (/chat, /room) dinleyici kurulmaz → geri doğal çalışır,
+  // react-router listeye döndürür, çıkış SORULMAZ.
   useEffect(() => {
     if (!(status === "ready" && isAuthenticated)) return;
 
     const path = location.pathname;
     const isOnHome = path === "/" || path === "";
-
-    // Sadece ana sayfadayken geri tuşunu yakalayıp çıkış soralım.
-    // Sohbet sayfasında (/chat, /room) hiç dinleme kurmuyoruz →
-    // geri tuşu doğal çalışır, react-router listeye döndürür, çıkış SORULMAZ.
     if (!isOnHome) return;
 
-    // Ana sayfadayız: geri tuşunu yakalamak için buffer ekle
+    // Geri tuşunu yakalamak için buffer ekle
     window.history.pushState(null, "", window.location.href);
 
     let confirmOpen = false;
+
     const handlePopState = () => {
-      window.history.pushState(null, "", window.location.href);
-      if (confirmOpen) return;
+      // Modal zaten açıksa, buffer'ı yenile ve çık (çift modal olmasın)
+      if (confirmOpen) {
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+
       confirmOpen = true;
       Modal.confirm({
         title: "Uygulamadan Çık",
@@ -77,6 +78,8 @@ function App() {
         },
         onCancel: () => {
           confirmOpen = false;
+          // Kullanıcı kaldı → yeni buffer ekle ki bir sonraki geri tuşu da yakalansın
+          window.history.pushState(null, "", window.location.href);
         },
       });
     };

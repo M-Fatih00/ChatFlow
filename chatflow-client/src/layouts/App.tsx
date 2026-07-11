@@ -1,18 +1,24 @@
-import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import { getMe } from "../features/auth/authSlice";
 import { signalRService } from "../api/signalRService";
 import { message, Modal } from "antd";
-import "../index.css";
 import { clearActiveConversation } from "../features/chats/chatSlice";
+import { logoutUser } from "../features/auth/authSlice";
+import "../index.css";
 
 function App() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const { isAuthenticated, status, token } = useAppSelector(
     (state) => state.auth,
   );
+
+  const pathRef = useRef(location.pathname);
+  pathRef.current = location.pathname;
 
   useEffect(() => {
     dispatch(getMe());
@@ -40,20 +46,27 @@ function App() {
       window.removeEventListener("removedFromRoom", handleRemovedFromRoom);
   }, [navigate, dispatch]);
 
-  // Geri tuşuna basınca uygulamadan çıkmasın, çıkış onayı sorsun
+  // Geri tuşu: SADECE ana sayfadayken (/) çıkış onayı sor.
+  // Sohbetteyken (/chat/... veya /room/...) karışma — react-router zaten listeye döndürür.
   useEffect(() => {
-    // Sadece giriş yapmış kullanıcıda aktif olsun
     if (!(status === "ready" && isAuthenticated)) return;
-
-    // History'ye bir durum ekle (geri tuşu yakalanabilsin)
-    window.history.pushState(null, "", window.location.href);
 
     let confirmOpen = false;
 
     const handlePopState = () => {
+      const path = pathRef.current;
+      const onHomePage = path === "/" || path === "";
+
+      // Sohbet/oda sayfasındaysak: react-router zaten "/"'a döndürüyor.
+      // Biz karışmıyoruz — sohbet listesine dönsün, çıkış SORMA.
+      if (!onHomePage) {
+        return;
+      }
+
+      // Ana sayfadayız çıkış onayı
+      window.history.pushState(null, "", window.location.href);
       if (confirmOpen) return;
       confirmOpen = true;
-
       Modal.confirm({
         title: "Uygulamadan Çık",
         content: "Uygulamadan çıkmak istediğinize emin misiniz?",
@@ -62,17 +75,19 @@ function App() {
         cancelText: "İptal",
         onOk: () => {
           confirmOpen = false;
-          // Kullanıcıyı gerçekten geri götür (uygulamadan çık)
           window.removeEventListener("popstate", handlePopState);
-          window.history.back();
+          dispatch(logoutUser());
         },
         onCancel: () => {
           confirmOpen = false;
-          // Kullanıcıyı uygulamada tut (tekrar durum ekle)
-          window.history.pushState(null, "", window.location.href);
         },
       });
     };
+
+    // Ana sayfadaysak baştan bir buffer ekle (ilk geri tuşunu yakalayabilmek için)
+    if (pathRef.current === "/" || pathRef.current === "") {
+      window.history.pushState(null, "", window.location.href);
+    }
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);

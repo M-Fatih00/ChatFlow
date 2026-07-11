@@ -99,60 +99,58 @@ export default function Sidebar() {
     });
   };
 
-  // Uygulamadan çıkış onayı (ana panelde geri tuşu)
-  const confirmExit = () => {
-    Modal.confirm({
-      title: "Uygulamadan Çık",
-      content: "Uygulamadan çıkmak istediğinize emin misiniz?",
-      okText: "Çık",
-      okType: "danger",
-      cancelText: "İptal",
-      onOk: () => {
-        window.removeEventListener("popstate", handlePopStateRef.current!);
-        window.history.back();
-      },
-      onCancel: () => {
-        window.history.pushState(null, "", window.location.href);
-      },
-    });
-  };
-
   // Geri tuşu (popstate) — panel-aware navigasyon
-  const handlePopStateRef = useRef<(() => void) | null>(null);
+  const exitConfirmOpenRef = useRef(false);
   useEffect(() => {
+    // İlk buffer'ı ekle
     window.history.pushState(null, "", window.location.href);
 
     const handlePopState = () => {
+      // Her geri tuşunda ÖNCE yeni buffer ekle (istemsiz çıkışı engelle)
+      window.history.pushState(null, "", window.location.href);
+
       const panel = activePanelRef.current;
       const hasActiveChat = activeConvRef.current != null;
 
-      // 1) Sohbet açıksa → sohbeti kapat (listeye dön)
+      // 1) Sohbet açıksa → sohbeti kapat
       if (hasActiveChat) {
         dispatch(clearActiveConversation());
         navigate("/");
-        window.history.pushState(null, "", window.location.href);
         return;
       }
 
       // 2) Settings → Profile
       if (panel === "settings") {
         setActivePanel("profile");
-        window.history.pushState(null, "", window.location.href);
         return;
       }
 
       // 3) Profile / Groups / Contacts → Chats
       if (panel === "profile" || panel === "groups" || panel === "contacts") {
         setActivePanel("chats");
-        window.history.pushState(null, "", window.location.href);
         return;
       }
 
       // 4) Chats (ana panel) → çıkış onayı
-      confirmExit();
+      if (exitConfirmOpenRef.current) return;
+      exitConfirmOpenRef.current = true;
+      Modal.confirm({
+        title: "Uygulamadan Çık",
+        content: "Uygulamadan çıkmak istediğinize emin misiniz?",
+        okText: "Çık",
+        okType: "danger",
+        cancelText: "İptal",
+        onOk: () => {
+          exitConfirmOpenRef.current = false;
+          window.removeEventListener("popstate", handlePopState);
+          window.history.go(-2);
+        },
+        onCancel: () => {
+          exitConfirmOpenRef.current = false;
+        },
+      });
     };
 
-    handlePopStateRef.current = handlePopState;
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps

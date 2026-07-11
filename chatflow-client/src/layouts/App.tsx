@@ -1,12 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/store";
-import { getMe } from "../features/auth/authSlice";
+import { getMe, logoutUser } from "../features/auth/authSlice";
 import { signalRService } from "../api/signalRService";
 import { message, Modal } from "antd";
-import { clearActiveConversation } from "../features/chats/chatSlice";
-import { logoutUser } from "../features/auth/authSlice";
 import "../index.css";
+import { clearActiveConversation } from "../features/chats/chatSlice";
 
 function App() {
   const dispatch = useAppDispatch();
@@ -16,9 +15,6 @@ function App() {
   const { isAuthenticated, status, token } = useAppSelector(
     (state) => state.auth,
   );
-
-  const pathRef = useRef(location.pathname);
-  pathRef.current = location.pathname;
 
   useEffect(() => {
     dispatch(getMe());
@@ -46,24 +42,25 @@ function App() {
       window.removeEventListener("removedFromRoom", handleRemovedFromRoom);
   }, [navigate, dispatch]);
 
-  // Geri tuşu: SADECE ana sayfadayken (/) çıkış onayı sor.
-  // Sohbetteyken (/chat/... veya /room/...) karışma — react-router zaten listeye döndürür.
+  // Geri tuşu: SADECE ana sayfada (/) çıkış onayı sor.
+  // Bu effect her path değişiminde yeniden kurulur; closure'daki `isOnHome`
+  // o anki path'i taze tutar (ref/timing sorunu yok).
   useEffect(() => {
     if (!(status === "ready" && isAuthenticated)) return;
 
+    const path = location.pathname;
+    const isOnHome = path === "/" || path === "";
+
+    // Sadece ana sayfadayken geri tuşunu yakalayıp çıkış soralım.
+    // Sohbet sayfasında (/chat, /room) hiç dinleme kurmuyoruz →
+    // geri tuşu doğal çalışır, react-router listeye döndürür, çıkış SORULMAZ.
+    if (!isOnHome) return;
+
+    // Ana sayfadayız: geri tuşunu yakalamak için buffer ekle
+    window.history.pushState(null, "", window.location.href);
+
     let confirmOpen = false;
-
     const handlePopState = () => {
-      const path = pathRef.current;
-      const onHomePage = path === "/" || path === "";
-
-      // Sohbet/oda sayfasındaysak: react-router zaten "/"'a döndürüyor.
-      // Biz karışmıyoruz — sohbet listesine dönsün, çıkış SORMA.
-      if (!onHomePage) {
-        return;
-      }
-
-      // Ana sayfadayız çıkış onayı
       window.history.pushState(null, "", window.location.href);
       if (confirmOpen) return;
       confirmOpen = true;
@@ -84,14 +81,9 @@ function App() {
       });
     };
 
-    // Ana sayfadaysak baştan bir buffer ekle (ilk geri tuşunu yakalayabilmek için)
-    if (pathRef.current === "/" || pathRef.current === "") {
-      window.history.pushState(null, "", window.location.href);
-    }
-
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [status, isAuthenticated]);
+  }, [status, isAuthenticated, location.pathname, dispatch]);
 
   if (status === "loading" || status === "idle") {
     return (

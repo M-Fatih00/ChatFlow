@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import { getMe } from "../features/auth/authSlice";
@@ -10,9 +10,15 @@ import { clearActiveConversation } from "../features/chats/chatSlice";
 function App() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
   const { isAuthenticated, status, token } = useAppSelector(
     (state) => state.auth,
   );
+
+  const { activeConversationId } = useAppSelector((state) => state.chat);
+
+  const activeConvRef = useRef(activeConversationId);
+  activeConvRef.current = activeConversationId;
 
   useEffect(() => {
     dispatch(getMe());
@@ -40,20 +46,27 @@ function App() {
       window.removeEventListener("removedFromRoom", handleRemovedFromRoom);
   }, [navigate, dispatch]);
 
-  // Geri tuşuna basınca uygulamadan çıkmasın, çıkış onayı sorsun
+  // Geri tuşu: sohbet açıksa kapat, değilse çıkış onayı
   useEffect(() => {
-    // Sadece giriş yapmış kullanıcıda aktif olsun
     if (!(status === "ready" && isAuthenticated)) return;
 
-    // History'ye bir durum ekledik (geri tuşu yakalanabilsin diye)
     window.history.pushState(null, "", window.location.href);
 
     let confirmOpen = false;
-
     const handlePopState = () => {
+      // Her geri tuşunda önce buffer'ı yenile (istemsiz çıkışı engelle)
+      window.history.pushState(null, "", window.location.href);
+
+      // Sohbet açıksa → kapat, listeye dön
+      if (activeConvRef.current != null) {
+        dispatch(clearActiveConversation());
+        navigate("/");
+        return;
+      }
+
+      // Sohbet kapalı → çıkış onayı
       if (confirmOpen) return;
       confirmOpen = true;
-
       Modal.confirm({
         title: "Uygulamadan Çık",
         content: "Uygulamadan çıkmak istediğinize emin misiniz?",
@@ -62,14 +75,11 @@ function App() {
         cancelText: "İptal",
         onOk: () => {
           confirmOpen = false;
-          // Kullanıcıyı gerçekten geri götür (uygulamadan çık)
           window.removeEventListener("popstate", handlePopState);
-          window.history.back();
+          window.history.go(-2);
         },
         onCancel: () => {
           confirmOpen = false;
-          // Kullanıcıyı uygulamada tut (tekrar durum ekle)
-          window.history.pushState(null, "", window.location.href);
         },
       });
     };

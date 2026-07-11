@@ -27,6 +27,8 @@ function App() {
 
     if (status === "ready" && isAuthenticated && token) {
       signalRService.connect(token);
+      // Mobilde giriş sonrası layout'u yeniden hesaplat (sidebar hemen görünsün)
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
     }
   }, [status, isAuthenticated, token]);
 

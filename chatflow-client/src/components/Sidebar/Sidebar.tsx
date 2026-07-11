@@ -36,7 +36,6 @@ export default function Sidebar() {
   const [activePanel, setActivePanel] = useState<PanelType>("chats");
   const [tooltipKey, setTooltipKey] = useState<string | null>(null);
   const { user } = useAppSelector((state) => state.auth);
-  const { activeConversationId } = useAppSelector((state) => state.chat);
 
   const [hasNewContact, setHasNewContact] = useState(false);
   const [hasNewChat, setHasNewChat] = useState(false);
@@ -48,10 +47,6 @@ export default function Sidebar() {
   // Aktif paneli her zaman güncel tutan ref (event handler'larda okumak için)
   const activePanelRef = useRef(activePanel);
   activePanelRef.current = activePanel;
-
-  // Aktif sohbeti güncel tutan ref
-  const activeConvRef = useRef(activeConversationId);
-  activeConvRef.current = activeConversationId;
 
   useEffect(() => {
     if (!tooltipKey) return;
@@ -98,63 +93,6 @@ export default function Sidebar() {
       onOk: () => dispatch(logoutUser()),
     });
   };
-
-  // Geri tuşu (popstate) — panel-aware navigasyon
-  const exitConfirmOpenRef = useRef(false);
-  useEffect(() => {
-    // İlk buffer'ı ekle
-    window.history.pushState(null, "", window.location.href);
-
-    const handlePopState = () => {
-      // Her geri tuşunda ÖNCE yeni buffer ekle (istemsiz çıkışı engelle)
-      window.history.pushState(null, "", window.location.href);
-
-      const panel = activePanelRef.current;
-      const hasActiveChat = activeConvRef.current != null;
-
-      // 1) Sohbet açıksa → sohbeti kapat
-      if (hasActiveChat) {
-        dispatch(clearActiveConversation());
-        navigate("/");
-        return;
-      }
-
-      // 2) Settings → Profile
-      if (panel === "settings") {
-        setActivePanel("profile");
-        return;
-      }
-
-      // 3) Profile / Groups / Contacts → Chats
-      if (panel === "profile" || panel === "groups" || panel === "contacts") {
-        setActivePanel("chats");
-        return;
-      }
-
-      // 4) Chats (ana panel) → çıkış onayı
-      if (exitConfirmOpenRef.current) return;
-      exitConfirmOpenRef.current = true;
-      Modal.confirm({
-        title: "Uygulamadan Çık",
-        content: "Uygulamadan çıkmak istediğinize emin misiniz?",
-        okText: "Çık",
-        okType: "danger",
-        cancelText: "İptal",
-        onOk: () => {
-          exitConfirmOpenRef.current = false;
-          window.removeEventListener("popstate", handlePopState);
-          window.history.go(-2);
-        },
-        onCancel: () => {
-          exitConfirmOpenRef.current = false;
-        },
-      });
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Contacts noktası: bekleyen arkadaşlık isteği var mı?
   useEffect(() => {

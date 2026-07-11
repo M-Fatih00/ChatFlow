@@ -1,4 +1,4 @@
-import { Input, Button, message as antdMessage } from "antd";
+import { Input, message as antdMessage } from "antd";
 import {
   SmileOutlined,
   PaperClipOutlined,

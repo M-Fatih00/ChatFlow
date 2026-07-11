@@ -260,15 +260,15 @@ export default function MessageInput() {
           }}
         />
 
-        <Button
-          type="primary"
-          shape="circle"
-          icon={<SendOutlined />}
-          size="large"
-          className="message-input-send-btn"
-          onMouseDown={(e) => e.preventDefault()}
+        
+        <button
+          type="button"
+          className="message-input-send-btn-native"
+          onPointerDown={(e) => e.preventDefault()}
           onClick={handleSend}
-        />
+        >
+          <SendOutlined />
+        </button>
       </div>
     </div>
   );

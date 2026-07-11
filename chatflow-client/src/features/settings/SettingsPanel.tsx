@@ -13,10 +13,14 @@ import {
   SearchOutlined,
   StopOutlined,
   UserOutlined,
-  LogoutOutlined
+  LogoutOutlined,
 } from "@ant-design/icons";
 import { useAppSelector, useAppDispatch } from "../../store/store";
-import { updateAvatar, updateProfile, logoutUser } from "../../features/auth/authSlice";
+import {
+  updateAvatar,
+  updateProfile,
+  logoutUser,
+} from "../../features/auth/authSlice";
 import agent from "../../api/requests";
 import { useRef, useState, useEffect } from "react";
 import { avatarUrl } from "../../utils/avatarUrl";
@@ -40,6 +44,8 @@ export default function SettingsPanel() {
   // Profil düzenleme modalı
   const [editOpen, setEditOpen] = useState(false);
   const [fullName, setFullName] = useState("");
+  const [userName, setUserName] = useState("");
+  const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -109,6 +115,8 @@ export default function SettingsPanel() {
 
   const openEditModal = () => {
     setFullName(user?.fullName ?? "");
+    setUserName(user?.userName ?? "");
+    setEmail(user?.email ?? "");
     setBio(user?.bio ?? "");
     setEditOpen(true);
   };
@@ -118,12 +126,21 @@ export default function SettingsPanel() {
       message.warning("İsim boş olamaz");
       return;
     }
+    if (!userName.trim()) {
+      message.warning("Kullanıcı adı boş olamaz");
+      return;
+    }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      message.warning("Geçerli bir e-posta adresi girin");
+      return;
+    }
 
     setSaving(true);
     try {
       const res = await agent.User.updateProfile({
         fullName: fullName.trim(),
-        userName: user?.userName ?? "",
+        userName: userName.trim(),
+        email: email.trim(),
         avatar: user?.avatar,
         bio: bio.trim(),
       });
@@ -131,13 +148,15 @@ export default function SettingsPanel() {
         updateProfile({
           fullName: res.fullName,
           userName: res.userName,
+          email: res.email,
           bio: res.bio,
         }),
       );
       message.success("Profil güncellendi");
       setEditOpen(false);
-    } catch {
-      message.error("Profil güncellenemedi");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? "Profil güncellenemedi";
+      message.error(msg);
     } finally {
       setSaving(false);
     }
@@ -252,6 +271,14 @@ export default function SettingsPanel() {
                   <button className="settings-edit-btn" onClick={openEditModal}>
                     <EditOutlined style={{ fontSize: 12 }} /> Edit
                   </button>
+                </div>
+                <div className="settings-info-row">
+                  <div>
+                    <Text className="settings-info-label">Username</Text>
+                    <Text className="settings-info-value">
+                      @{user?.userName ?? "-"}
+                    </Text>
+                  </div>
                 </div>
                 <div className="settings-info-row">
                   <div>
@@ -486,6 +513,25 @@ export default function SettingsPanel() {
             style={{ marginTop: 6 }}
           />
         </div>
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>Kullanıcı Adı</Text>
+          <Input
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            placeholder="kullaniciadi"
+            style={{ marginTop: 6 }}
+          />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>E-posta</Text>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="ornek@email.com"
+            style={{ marginTop: 6 }}
+          />
+        </div>
         <div>
           <Text strong>Hakkında</Text>
           <TextArea
@@ -499,6 +545,7 @@ export default function SettingsPanel() {
           />
         </div>
       </Modal>
+
       {/* Çıkış (özellikle mobilde) */}
       <div className="settings-logout-section">
         <Button

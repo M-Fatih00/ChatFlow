@@ -78,8 +78,36 @@ public class UserController : ControllerBase
         if (user == null)
             return NotFound(new { message = "Kullanıcı bulunamadı." });
 
+        // E-posta değiştiyse: benzersizlik kontrolü + Identity email güncelleme
+        if (!string.IsNullOrWhiteSpace(dto.Email) &&
+            !string.Equals(dto.Email, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            // Bu e-posta başka bir kullanıcıda var mı?
+            var existing = await _userManager.FindByEmailAsync(dto.Email);
+            if (existing != null && existing.Id != user.Id)
+                return BadRequest(new { message = "Bu e-posta adresi zaten kullanılıyor." });
+
+            // Identity üzerinden güncelle (Email + NormalizedEmail birlikte güncellenir)
+            var setEmailResult = await _userManager.SetEmailAsync(user, dto.Email);
+            if (!setEmailResult.Succeeded)
+                return BadRequest(new { message = "E-posta güncellenemedi." });
+        }
+
+        // Kullanıcı adı değiştiyse: benzersizlik kontrolü + Identity güncelleme
+        if (!string.IsNullOrWhiteSpace(dto.UserName) &&
+            !string.Equals(dto.UserName, user.UserName, StringComparison.OrdinalIgnoreCase))
+        {
+            var existingUser = await _userManager.FindByNameAsync(dto.UserName);
+            if (existingUser != null && existingUser.Id != user.Id)
+                return BadRequest(new { message = "Bu kullanıcı adı zaten kullanılıyor." });
+
+            // Identity üzerinden güncelle (UserName + NormalizedUserName birlikte güncellenir)
+            var setNameResult = await _userManager.SetUserNameAsync(user, dto.UserName);
+            if (!setNameResult.Succeeded)
+                return BadRequest(new { message = "Kullanıcı adı güncellenemedi." });
+        }
+
         user.FullName = dto.FullName;
-        user.UserName = dto.UserName;
         user.Avatar = dto.Avatar;
         user.Bio = dto.Bio;
 
@@ -90,6 +118,7 @@ public class UserController : ControllerBase
             Id = user.Id,
             FullName = user.FullName,
             UserName = user.UserName!,
+            Email = user.Email,
             Avatar = user.Avatar,
             Bio = user.Bio
         });

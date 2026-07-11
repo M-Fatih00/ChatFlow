@@ -1,4 +1,8 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import {
+  createAsyncThunk,
+  createSlice,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import requests from "../../api/requests";
 import type { IUser } from "../../models/IUser";
 import type { FieldValues } from "react-hook-form";
@@ -77,11 +81,17 @@ export const authSlice = createSlice({
     },
     updateProfile(
       state,
-      action: { payload: { fullName: string; userName: string; bio?: string } },
+      action: PayloadAction<{
+        fullName: string;
+        userName: string;
+        email?: string;
+        bio?: string;
+      }>,
     ) {
       if (state.user) {
         state.user.fullName = action.payload.fullName;
         state.user.userName = action.payload.userName;
+        state.user.email = action.payload.email;
         state.user.bio = action.payload.bio;
       }
     },

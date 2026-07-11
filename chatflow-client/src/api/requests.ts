@@ -121,6 +121,7 @@ const User = {
     fullName: string;
     userName: string;
     avatar?: string;
+    email?: string;
     bio?: string;
   }) => requests.put("user/profile", data),
   updateAvatar: (data: FormData) => requests.put("user/avatar", data),

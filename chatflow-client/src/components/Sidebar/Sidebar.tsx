@@ -36,6 +36,7 @@ export default function Sidebar() {
   const [activePanel, setActivePanel] = useState<PanelType>("chats");
   const [tooltipKey, setTooltipKey] = useState<string | null>(null);
   const { user } = useAppSelector((state) => state.auth);
+  const { activeConversationId } = useAppSelector((state) => state.chat);
 
   const [hasNewContact, setHasNewContact] = useState(false);
   const [hasNewChat, setHasNewChat] = useState(false);
@@ -47,6 +48,10 @@ export default function Sidebar() {
   // Aktif paneli her zaman güncel tutan ref (event handler'larda okumak için)
   const activePanelRef = useRef(activePanel);
   activePanelRef.current = activePanel;
+
+  // Aktif sohbeti güncel tutan ref
+  const activeConvRef = useRef(activeConversationId);
+  activeConvRef.current = activeConversationId;
 
   useEffect(() => {
     if (!tooltipKey) return;
@@ -93,6 +98,65 @@ export default function Sidebar() {
       onOk: () => dispatch(logoutUser()),
     });
   };
+
+  // Uygulamadan çıkış onayı (ana panelde geri tuşu)
+  const confirmExit = () => {
+    Modal.confirm({
+      title: "Uygulamadan Çık",
+      content: "Uygulamadan çıkmak istediğinize emin misiniz?",
+      okText: "Çık",
+      okType: "danger",
+      cancelText: "İptal",
+      onOk: () => {
+        window.removeEventListener("popstate", handlePopStateRef.current!);
+        window.history.back();
+      },
+      onCancel: () => {
+        window.history.pushState(null, "", window.location.href);
+      },
+    });
+  };
+
+  // Geri tuşu (popstate) — panel-aware navigasyon
+  const handlePopStateRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      const panel = activePanelRef.current;
+      const hasActiveChat = activeConvRef.current != null;
+
+      // 1) Sohbet açıksa → sohbeti kapat (listeye dön)
+      if (hasActiveChat) {
+        dispatch(clearActiveConversation());
+        navigate("/");
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+
+      // 2) Settings → Profile
+      if (panel === "settings") {
+        setActivePanel("profile");
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+
+      // 3) Profile / Groups / Contacts → Chats
+      if (panel === "profile" || panel === "groups" || panel === "contacts") {
+        setActivePanel("chats");
+        window.history.pushState(null, "", window.location.href);
+        return;
+      }
+
+      // 4) Chats (ana panel) → çıkış onayı
+      confirmExit();
+    };
+
+    handlePopStateRef.current = handlePopState;
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Contacts noktası: bekleyen arkadaşlık isteği var mı?
   useEffect(() => {

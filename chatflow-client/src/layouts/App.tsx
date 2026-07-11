@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import { getMe } from "../features/auth/authSlice";
 import { signalRService } from "../api/signalRService";
-import { message, Modal } from "antd";
+import { message } from "antd";
 import "../index.css";
 import { clearActiveConversation } from "../features/chats/chatSlice";
 
@@ -40,43 +40,7 @@ function App() {
       window.removeEventListener("removedFromRoom", handleRemovedFromRoom);
   }, [navigate, dispatch]);
 
-  // Geri tuşuna basınca uygulamadan çıkmasın, çıkış onayı sorsun
-  useEffect(() => {
-    // Sadece giriş yapmış kullanıcıda aktif olsun
-    if (!(status === "ready" && isAuthenticated)) return;
-
-    // History'ye bir durum ekledik (geri tuşu yakalanabilsin diye)
-    window.history.pushState(null, "", window.location.href);
-
-    let confirmOpen = false;
-
-    const handlePopState = () => {
-      if (confirmOpen) return;
-      confirmOpen = true;
-
-      Modal.confirm({
-        title: "Uygulamadan Çık",
-        content: "Uygulamadan çıkmak istediğinize emin misiniz?",
-        okText: "Çık",
-        okType: "danger",
-        cancelText: "İptal",
-        onOk: () => {
-          confirmOpen = false;
-          // Kullanıcıyı gerçekten geri götür (uygulamadan çık)
-          window.removeEventListener("popstate", handlePopState);
-          window.history.back();
-        },
-        onCancel: () => {
-          confirmOpen = false;
-          // Kullanıcıyı uygulamada tut (tekrar durum ekle)
-          window.history.pushState(null, "", window.location.href);
-        },
-      });
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [status, isAuthenticated]);
+  
 
   if (status === "loading" || status === "idle") {
     return (

@@ -96,7 +96,6 @@ export default function MessageInput() {
     setContent("");
     setAttachment(null);
     setEmojiOpen(false);
-    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -267,6 +266,7 @@ export default function MessageInput() {
           icon={<SendOutlined />}
           size="large"
           className="message-input-send-btn"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={handleSend}
         />
       </div>

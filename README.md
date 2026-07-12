@@ -31,13 +31,17 @@ Canlı demoyu hızlıca deneyebilmeniz için aşağıdaki test kullanıcıların
 
 ## 📸 Ekran Görüntüleri
 
-<p align="center">
-  <img src="docs/UserMessage.png" width="60%" />
-  <img src="docs/mobil.png" width="30%" />
-</p>
+### 💬 Grup Sohbeti
 
 <p align="center">
-  <img src="docs/GroupsMessage.png" width="80%" />
+  <img src="docs/GroupsMessage.png" width="95%">
+</p>
+
+### 👥 Birebir Mesajlaşma & 📱 Mobil
+
+<p align="center">
+  <img src="docs/UserMessage.png" width="75%">
+  <img src="docs/mobil.png" width="20%">
 </p>
 
 

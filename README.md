@@ -50,11 +50,13 @@ Canlı demoyu hızlıca deneyebilmeniz için aşağıdaki test kullanıcıların
 ### 📱 Mobil Görünüm
 
 <p align="center">
-  <img src="docs/mobil.png" width="35%">
+  <img src="docs/mobil.png" width="40%">
 </p>
 
 
 ---
+
+
 
 ## 🎥 Tanıtım Videoları
 
@@ -73,6 +75,7 @@ Responsive mobil arayüz.
 
 
 
+---
 
 
 ## ✨ Özellikler

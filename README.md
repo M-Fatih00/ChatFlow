@@ -63,15 +63,19 @@ Canlı demoyu hızlıca deneyebilmeniz için aşağıdaki test kullanıcıların
 ### Genel Kullanım (Masaüstü)
 Giriş, profil, sohbet ve grup yönetimi.
 
+https://github.com/user-attachments/assets/815e06b5-94fa-49af-ad11-cc1b7649a0f2
 
 
 ### Mobil Kullanım
 Responsive mobil arayüz.
 
+https://github.com/user-attachments/assets/e73b725f-2907-4d50-9b51-9a988190450f
 
 
 ### Gerçek Zamanlı Mesajlaşma (İki Kullanıcı)
 İki kullanıcının aynı anda mesajlaşması — mesajlar, mesaj silme, okundu bilgisi ve yazıyor göstergesi anlık yansır.
+
+https://github.com/user-attachments/assets/0d2bc325-7dde-411b-a023-d9b4b3933595
 
 
 

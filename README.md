@@ -297,7 +297,7 @@ ChatFlow/
 
 **Mehmet Fatih Canıbek**
 
-- LinkedIn: [linkedin.com/in/mehmet-fatih-canıbek-87620b335](https://www.linkedin.com/in/mehmet-fatih-canıbek-87620b335)
+- LinkedIn: [linkedin.com/in/mehmet-fatih-canibek](https://www.linkedin.com/in/mehmet-fatih-canibek)
 - GitHub: [@M-Fatih00](https://github.com/M-Fatih00)
 
 ---

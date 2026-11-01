@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Avatar,
-  Collapse,
-  Typography,
   Button,
+  Collapse,
   Modal,
+  Skeleton,
+  Typography,
   message as antdMessage,
 } from "antd";
-import { CloseOutlined, UserOutlined, StopOutlined } from "@ant-design/icons";
+import { CloseOutlined, StopOutlined, UserOutlined } from "@ant-design/icons";
 import type { IUser } from "../../models/IUser";
 import agent from "../../api/requests";
 import { avatarUrl } from "../../utils/avatarUrl";
-import "./UserDetailPanel.css";
 import { formatLastSeen } from "../../utils/lastSeen";
+import { getApiError } from "../../utils/apiError";
+import "./UserDetailPanel.css";
 
 const { Text } = Typography;
 
@@ -28,13 +30,25 @@ export default function UserDetailPanel({
   onClose,
 }: UserDetailPanelProps) {
   const [iBlocked, setIBlocked] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [loadingBlock, setLoadingBlock] = useState(false);
 
-  // Engel durumunu çek
   useEffect(() => {
+    let cancelled = false;
+    setStatusLoading(true);
+
     agent.Block.getStatus(user.id)
-      .then((res: { iBlocked: boolean }) => setIBlocked(res.iBlocked))
-      .catch(() => {});
+      .then((res: { iBlocked: boolean }) => {
+        if (!cancelled) setIBlocked(res.iBlocked);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setStatusLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [user.id]);
 
   const handleToggleBlock = async () => {
@@ -49,12 +63,11 @@ export default function UserDetailPanel({
         setIBlocked(true);
         antdMessage.success("Kullanıcı engellendi");
       }
-      // Header + mesaj kutusu güncellensin
       window.dispatchEvent(
         new CustomEvent("blockStatusChanged", { detail: { userId: user.id } }),
       );
-    } catch {
-      antdMessage.error("İşlem başarısız");
+    } catch (error) {
+      antdMessage.error(getApiError(error, "İşlem başarısız"));
     } finally {
       setLoadingBlock(false);
     }
@@ -62,74 +75,71 @@ export default function UserDetailPanel({
 
   const confirmBlock = () => {
     if (iBlocked) {
-      handleToggleBlock(); // engel kaldırmada onay yok
-    } else {
-      Modal.confirm({
-        title: "Kullanıcıyı engelle",
-        content: `${user.fullName} engellenecek. Karşılıklı mesajlaşma kapanacak.`,
-        okText: "Engelle",
-        okType: "danger",
-        cancelText: "İptal",
-        onOk: handleToggleBlock,
-      });
+      handleToggleBlock();
+      return;
     }
+
+    Modal.confirm({
+      title: "Kullanıcıyı engelle",
+      content: `${user.fullName} engellenecek. Karşılıklı mesajlaşma kapanacak ve arkadaş listenizden çıkarılacak.`,
+      okText: "Engelle",
+      okType: "danger",
+      cancelText: "İptal",
+      onOk: handleToggleBlock,
+    });
   };
+
+  const showOnline = isOnline && !iBlocked;
+  const statusText = iBlocked
+    ? "Engellendi"
+    : isOnline
+      ? "çevrimiçi"
+      : formatLastSeen(user.lastSeen);
 
   return (
     <div className="user-detail-panel">
-      {/* Header */}
       <div className="user-detail-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Text className="user-detail-title">Profil</Text>
-        </div>
-        <CloseOutlined
+        <Text className="user-detail-title">Profil</Text>
+        <button
+          type="button"
+          className="user-detail-close"
           onClick={onClose}
-          style={{ fontSize: 20, color: "#aaa", cursor: "pointer" }}
-        />
+          aria-label="Kapat"
+        >
+          <CloseOutlined />
+        </button>
       </div>
 
-      {/* Avatar + isim + durum */}
       <div className="user-detail-avatar-section">
         <Avatar
           size={96}
           src={avatarUrl(user.avatar)}
-          style={{
-            background: "var(--color-primary)",
-            fontSize: 34,
-            fontWeight: 600,
-          }}
+          className="user-detail-avatar"
         >
           {user.fullName?.charAt(0).toUpperCase() ?? "U"}
         </Avatar>
         <Text className="user-detail-name">{user.fullName}</Text>
-        <div className="user-detail-status">
-          <div
-            className="user-detail-status-dot"
-            style={{
-              background: isOnline && !iBlocked ? "#52c41a" : "#c0c0c0",
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 13,
-              color: isOnline && !iBlocked ? "var(--color-primary)" : "#aaa",
-            }}
-          >
-            {iBlocked
-              ? "Offline"
-              : isOnline
-                ? "çevrimiçi"
-                : formatLastSeen(user.lastSeen)}
-          </Text>
-        </div>
+        <Text className="user-detail-username">@{user.userName}</Text>
+        {statusLoading ? (
+          <Skeleton.Input active size="small" className="user-detail-status-skeleton" />
+        ) : (
+          <div className="user-detail-status">
+            <span
+              className={`user-detail-status-dot ${showOnline ? "is-online" : ""}`}
+            />
+            <Text
+              className={`user-detail-status-text ${showOnline ? "is-online" : ""}`}
+            >
+              {statusText}
+            </Text>
+          </div>
+        )}
       </div>
 
-      {/* Bio */}
       <div className="user-detail-bio">
-        {user.bio ?? "Henüz bir açıklama eklenmemiş."}
+        {user.bio || "Henüz bir açıklama eklenmemiş."}
       </div>
 
-      {/* About collapse */}
       <Collapse
         defaultActiveKey={["about"]}
         ghost
@@ -138,17 +148,16 @@ export default function UserDetailPanel({
           {
             key: "about",
             label: (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <UserOutlined style={{ color: "var(--color-primary)" }} />
-                <Text strong>About</Text>
+              <div className="user-detail-collapse-label">
+                <UserOutlined className="user-detail-collapse-icon" />
+                <Text strong>Hakkında</Text>
               </div>
             ),
             children: (
               <div className="user-detail-about-box">
                 {[
-                  { label: "Name", value: user.fullName ?? "-" },
-                  { label: "Username", value: user.userName ?? "-" },
-                  { label: "Email", value: user.email ?? "-" },
+                  { label: "Ad soyad", value: user.fullName || "-" },
+                  { label: "Kullanıcı adı", value: `@${user.userName}` },
                 ].map((item) => (
                   <div key={item.label} className="user-detail-about-item">
                     <Text className="user-detail-about-label">
@@ -165,13 +174,13 @@ export default function UserDetailPanel({
         ]}
       />
 
-      {/* Engelle / Engeli kaldır */}
-      <div style={{ padding: "8px 16px 20px" }}>
+      <div className="user-detail-actions">
         <Button
           danger={!iBlocked}
           block
           icon={<StopOutlined />}
           loading={loadingBlock}
+          disabled={statusLoading}
           onClick={confirmBlock}
         >
           {iBlocked ? "Engeli Kaldır" : "Engelle"}

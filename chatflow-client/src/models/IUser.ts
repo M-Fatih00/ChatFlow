@@ -5,7 +5,6 @@ export interface IUser {
   email?: string;
   avatar?: string;
   bio?: string;
-  token?: string;
   lastSeen?: string;
   isOnline?: boolean;
   createdAt?: string;

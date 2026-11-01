@@ -1,235 +1,345 @@
-import { useNavigate } from "react-router-dom";
+import { useState, type CSSProperties } from "react";
+import { Alert, Button, Card, Input, Typography } from "antd";
+import {
+  LockOutlined,
+  MailOutlined,
+  MessageOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { Controller, useForm } from "react-hook-form";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../store/store";
-import { useForm } from "react-hook-form";
-import type { IRegisterForm } from "../../models/IRegisterForm";
 import { registerUser } from "./authSlice";
-import { Card, Input, Button, Typography } from "antd";
-import { UserOutlined, LockOutlined, MailOutlined } from "@ant-design/icons";
-import { Controller } from "react-hook-form";
-import { Link } from "react-router-dom";
+import type { IRegisterForm } from "../../models/IRegisterForm";
 
 const { Title, Text } = Typography;
+
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { registerLoading } = useAppSelector((state) => state.auth);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<IRegisterForm>();
+  } = useForm<IRegisterForm>({
+    defaultValues: {
+      fullName: "",
+      email: "",
+      userName: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
   const onSubmit = async (data: IRegisterForm) => {
-    const result = await dispatch(registerUser(data));
+    setServerError(null);
+    const result = await dispatch(
+      registerUser({
+        ...data,
+        fullName: data.fullName.trim(),
+        email: data.email.trim(),
+        userName: data.userName.trim(),
+      }),
+    );
+
     if (registerUser.fulfilled.match(result)) {
-      navigate("/login");
+      toast.success(result.payload);
+      navigate("/login", { replace: true });
+    } else {
+      setServerError(result.payload ?? "Kayıt başarısız oldu.");
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-auth-bg)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "16px",
-      }}
-    >
-      <div style={{ marginBottom: 12, textAlign: "center" }}>
-        <Title level={3} style={{ margin: 0 }}>
-          ChatFlow
+    <div style={styles.page}>
+      <div style={styles.brand} className="anim anim-fade-down">
+        <div style={styles.logo}>
+          <MessageOutlined style={{ fontSize: 26, color: "#fff" }} />
+        </div>
+        <Title level={3} style={{ margin: "12px 0 4px" }}>
+          Hesap oluştur
         </Title>
+        <Text type="secondary">Birkaç saniyede ChatFlow'a katıl.</Text>
       </div>
 
-      <Title level={4} style={{ marginBottom: 2 }}>
-        Sign up
-      </Title>
-      <Text type="secondary" style={{ marginBottom: 14, fontSize: 13 }}>
-        Get your ChatFlow account now.
-      </Text>
-
       <Card
-        style={{ width: "100%", maxWidth: 420, borderRadius: 12 }}
-        styles={{ body: { padding: "16px 20px" } }}
+        className="anim anim-fade-up"
+        style={{ ...styles.card, animationDelay: "80ms" }}
+        styles={{ body: { padding: 28 } }}
       >
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Full Name */}
-          <div style={{ marginBottom: 10 }}>
-            <Text strong style={{ fontSize: 13 }}>Full Name</Text>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div style={styles.field}>
+            <label htmlFor="fullName">
+              <Text strong>Ad soyad</Text>
+            </label>
             <Controller
               name="fullName"
               control={control}
-              rules={{ required: "Ad soyad zorunlu" }}
+              rules={{
+                required: "Ad soyad zorunlu",
+                minLength: { value: 2, message: "En az 2 karakter" },
+                maxLength: { value: 60, message: "En fazla 60 karakter" },
+              }}
               render={({ field }) => (
                 <Input
                   {...field}
+                  id="fullName"
                   prefix={<UserOutlined />}
-                  placeholder="Enter Full Name"
-                  size="middle"
-                  style={{ marginTop: 4 }}
+                  placeholder="Adınız Soyadınız"
+                  size="large"
+                  autoComplete="name"
+                  maxLength={60}
+                  style={styles.input}
                   status={errors.fullName ? "error" : ""}
                 />
               )}
             />
             {errors.fullName && (
-              <Text type="danger" style={{ fontSize: 12 }}>{errors.fullName.message}</Text>
+              <Text type="danger" style={styles.error}>
+                {errors.fullName.message}
+              </Text>
             )}
           </div>
 
-          {/* Email */}
-          <div style={{ marginBottom: 10 }}>
-            <Text strong style={{ fontSize: 13 }}>Email</Text>
+          <div style={styles.field}>
+            <label htmlFor="email">
+              <Text strong>E-posta</Text>
+            </label>
             <Controller
               name="email"
               control={control}
-              rules={{ required: "Email zorunlu" }}
+              rules={{
+                required: "E-posta zorunlu",
+                pattern: {
+                  value: EMAIL_PATTERN,
+                  message: "Geçerli bir e-posta girin",
+                },
+              }}
               render={({ field }) => (
                 <Input
                   {...field}
+                  id="email"
+                  type="email"
                   prefix={<MailOutlined />}
-                  placeholder="Enter Email"
-                  size="middle"
-                  style={{ marginTop: 4 }}
+                  placeholder="ornek@mail.com"
+                  size="large"
+                  autoComplete="email"
+                  maxLength={254}
+                  style={styles.input}
                   status={errors.email ? "error" : ""}
                 />
               )}
             />
             {errors.email && (
-              <Text type="danger" style={{ fontSize: 12 }}>{errors.email.message}</Text>
+              <Text type="danger" style={styles.error}>
+                {errors.email.message}
+              </Text>
             )}
           </div>
 
-          {/* Username */}
-          <div style={{ marginBottom: 10 }}>
-            <Text strong style={{ fontSize: 13 }}>Username</Text>
+          <div style={styles.field}>
+            <label htmlFor="userName">
+              <Text strong>Kullanıcı adı</Text>
+            </label>
             <Controller
               name="userName"
               control={control}
-              rules={{ required: "Kullanıcı adı zorunlu" }}
+              rules={{
+                required: "Kullanıcı adı zorunlu",
+                minLength: { value: 3, message: "En az 3 karakter" },
+                maxLength: { value: 30, message: "En fazla 30 karakter" },
+                pattern: {
+                  value: USERNAME_PATTERN,
+                  message: "Yalnızca harf, rakam, nokta, alt çizgi ve tire",
+                },
+              }}
               render={({ field }) => (
                 <Input
                   {...field}
+                  id="userName"
                   prefix={<UserOutlined />}
-                  placeholder="Enter Username"
-                  size="middle"
-                  style={{ marginTop: 4 }}
+                  placeholder="kullaniciadi"
+                  size="large"
+                  autoComplete="username"
+                  maxLength={30}
+                  style={styles.input}
                   status={errors.userName ? "error" : ""}
                 />
               )}
             />
             {errors.userName && (
-              <Text type="danger" style={{ fontSize: 12 }}>{errors.userName.message}</Text>
+              <Text type="danger" style={styles.error}>
+                {errors.userName.message}
+              </Text>
             )}
           </div>
 
-          {/* Password + Confirm yan yana (masaüstü), alt alta (mobil) */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 10,
-            }}
-          >
+          <div style={styles.passwordGrid}>
             <div>
-              <Text strong style={{ fontSize: 13 }}>Password</Text>
+              <label htmlFor="password">
+                <Text strong>Şifre</Text>
+              </label>
               <Controller
                 name="password"
                 control={control}
                 rules={{
                   required: "Şifre zorunlu",
-                  minLength: { value: 6, message: "En az 6 karakter" },
+                  minLength: { value: 8, message: "En az 8 karakter" },
+                  validate: (value) =>
+                    (/[a-z]/.test(value) && /\d/.test(value)) ||
+                    "Küçük harf ve rakam içermeli",
                 }}
                 render={({ field }) => (
                   <Input.Password
                     {...field}
+                    id="password"
                     prefix={<LockOutlined />}
-                    placeholder="Password"
-                    size="middle"
-                    style={{ marginTop: 4 }}
+                    placeholder="Şifre"
+                    size="large"
+                    autoComplete="new-password"
+                    maxLength={128}
+                    style={styles.input}
                     status={errors.password ? "error" : ""}
                   />
                 )}
               />
               {errors.password && (
-                <Text type="danger" style={{ fontSize: 12 }}>{errors.password.message}</Text>
+                <Text type="danger" style={styles.error}>
+                  {errors.password.message}
+                </Text>
               )}
             </div>
 
             <div>
-              <Text strong style={{ fontSize: 13 }}>Confirm</Text>
+              <label htmlFor="confirmPassword">
+                <Text strong>Şifre tekrar</Text>
+              </label>
               <Controller
                 name="confirmPassword"
                 control={control}
                 rules={{
-                  required: "Zorunlu",
+                  required: "Şifre tekrarı zorunlu",
                   validate: (value, formValues) =>
-                    value === formValues.password || "Eşleşmiyor",
+                    value === formValues.password || "Şifreler eşleşmiyor",
                 }}
                 render={({ field }) => (
                   <Input.Password
                     {...field}
+                    id="confirmPassword"
                     prefix={<LockOutlined />}
-                    placeholder="Confirm"
-                    size="middle"
-                    style={{ marginTop: 4 }}
+                    placeholder="Şifre tekrar"
+                    size="large"
+                    autoComplete="new-password"
+                    maxLength={128}
+                    style={styles.input}
                     status={errors.confirmPassword ? "error" : ""}
                   />
                 )}
               />
               {errors.confirmPassword && (
-                <Text type="danger" style={{ fontSize: 12 }}>{errors.confirmPassword.message}</Text>
+                <Text type="danger" style={styles.error}>
+                  {errors.confirmPassword.message}
+                </Text>
               )}
             </div>
           </div>
 
+          <Text type="secondary" style={styles.hint}>
+            Şifre en az 8 karakter olmalı, küçük harf ve rakam içermelidir.
+          </Text>
+
+          {serverError && (
+            <Alert
+              type="error"
+              message={serverError}
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           <Button
             type="primary"
             htmlType="submit"
-            size="middle"
+            size="large"
             block
             loading={registerLoading}
-            style={{
-              background: "var(--color-primary)",
-              borderColor: "var(--color-primary)",
-              marginTop: 4,
-            }}
+            style={styles.submit}
           >
-            Sign up
+            Kaydol
           </Button>
-
-          <Text
-            type="secondary"
-            style={{
-              display: "block",
-              textAlign: "center",
-              marginTop: 10,
-              fontSize: 11,
-            }}
-          >
-            By registering you agree to the ChatFlow{" "}
-            <a href="#" style={{ color: "var(--color-primary)" }}>
-              Terms of Use
-            </a>
-          </Text>
         </form>
       </Card>
 
-      <div style={{ marginTop: 14, textAlign: "center" }}>
-        <Text type="secondary" style={{ fontSize: 13 }}>Already have an account? </Text>
-        <Link to="/login" style={{ color: "var(--color-primary)", fontSize: 13 }}>
-          Signin
+      <div style={{ marginTop: 24 }}>
+        <Text type="secondary">Zaten hesabın var mı? </Text>
+        <Link to="/login" style={styles.link}>
+          Giriş yap
         </Link>
       </div>
 
-      <Text type="secondary" style={{ marginTop: 10, fontSize: 11 }}>
-        © 2024 ChatFlow. Crafted with ❤️
+      <Text type="secondary" style={styles.footer}>
+        © {new Date().getFullYear()} ChatFlow
       </Text>
     </div>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100dvh",
+    background: "var(--color-auth-bg)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  brand: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    background: "var(--color-primary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 460,
+    borderRadius: 16,
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.06)",
+  },
+  field: { marginBottom: 16 },
+  passwordGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: 12,
+    marginBottom: 8,
+  },
+  input: { marginTop: 6 },
+  error: { display: "block", marginTop: 4, fontSize: 12 },
+  hint: { display: "block", fontSize: 12, marginBottom: 16 },
+  submit: {
+    background: "var(--color-primary)",
+    borderColor: "var(--color-primary)",
+    height: 46,
+    fontWeight: 600,
+  },
+  link: { color: "var(--color-primary)", fontWeight: 600 },
+  footer: { marginTop: 16, fontSize: 12 },
+};

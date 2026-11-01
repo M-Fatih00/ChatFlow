@@ -1,71 +1,120 @@
 import {
   Avatar,
-  Input,
   Badge,
-  Typography,
   Dropdown,
+  Input,
   Modal,
+  Skeleton,
+  Typography,
   message as antdMessage,
 } from "antd";
 import {
-  SearchOutlined,
-  MoreOutlined,
   DeleteOutlined,
+  MoreOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
-import "./ChatsPanel.css";
-import { useEffect, useState, useRef } from "react";
-import type { IUser } from "../../models/IUser";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import agent from "../../api/requests";
 import { useAppDispatch, useAppSelector } from "../../store/store";
-import { useNavigate } from "react-router-dom";
+import type { IUser } from "../../models/IUser";
 import { avatarUrl } from "../../utils/avatarUrl";
 import { formatLastSeen } from "../../utils/lastSeen";
-import { clearActiveConversation } from "../chats/chatSlice";
+import { getApiError } from "../../utils/apiError";
+import { stagger } from "../../utils/animation";
+import { cache } from "../../utils/cache";
+import { useDelayedLoading } from "../../utils/useDelayedLoading";
+import { clearActiveConversation } from "./chatSlice";
+import "./ChatsPanel.css";
 
 const { Text } = Typography;
 
-export default function ChatsPanel() {
-  const [users, setUsers] = useState<IUser[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [blockedIds, setBlockedIds] = useState<string[]>([]);
-  const [friends, setFriends] = useState<IUser[]>([]);
-  // Mobil long-press menüsü
-  const [longPressUser, setLongPressUser] = useState<IUser | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+const rememberUsers = (list: IUser[]) =>
+  list.forEach((u) => cache.set(`user:${u.id}`, u));
 
+function ChatListSkeleton() {
+  return (
+    <div className="chats-skeleton">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="chats-skeleton-row">
+          <Skeleton.Avatar active size={42} />
+          <div className="chats-skeleton-lines">
+            <Skeleton.Input active size="small" block />
+            <Skeleton.Input active size="small" className="chats-skeleton-short" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function ChatsPanel() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { onlineUsers, activeConversationId, isRoom, unreadCounts } =
+    useAppSelector((state) => state.chat);
 
-  const { onlineUsers, activeConversationId, unreadCounts } = useAppSelector(
-    (state) => state.chat,
-  );
-  const { user: currentUser } = useAppSelector((state) => state.auth);
+  const [users, setUsers] = useState<IUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [friends, setFriends] = useState<IUser[]>([]);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [longPressUser, setLongPressUser] = useState<IUser | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showSkeleton = useDelayedLoading(loading, 120);
 
-  const loadConversations = () => {
+  const loadConversations = useCallback(() => {
     agent.Message.getConversations()
-      .then(setUsers)
-      .catch(() => {});
-  };
+      .then((list: IUser[]) => {
+        setUsers(list);
+        rememberUsers(list);
+      })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
-    const handler = () => loadConversations();
+    const handler = (e: Event) => {
+      if ((e as CustomEvent<{ isRoom?: boolean }>).detail?.isRoom) return;
+      loadConversations();
+    };
     window.addEventListener("messageReceived", handler);
     return () => window.removeEventListener("messageReceived", handler);
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     const load = () => {
       agent.Block.getBlocked()
         .then(setBlockedIds)
-        .catch(() => {});
+        .catch(() => undefined);
     };
     load();
     window.addEventListener("blockStatusChanged", load);
     return () => window.removeEventListener("blockStatusChanged", load);
+  }, []);
+
+  useEffect(() => {
+    const load = () => {
+      agent.Friendship.getFriends()
+        .then((list: IUser[]) => {
+          setFriends(list);
+          rememberUsers(list);
+        })
+        .catch(() => undefined);
+    };
+    load();
+    window.addEventListener("friendRequestAccepted", load);
+    window.addEventListener("friendRemoved", load);
+    window.addEventListener("blockStatusChanged", load);
+    return () => {
+      window.removeEventListener("friendRequestAccepted", load);
+      window.removeEventListener("friendRemoved", load);
+      window.removeEventListener("blockStatusChanged", load);
+    };
   }, []);
 
   useEffect(() => {
@@ -82,43 +131,35 @@ export default function ChatsPanel() {
     return () => window.removeEventListener("avatarUpdated", handler);
   }, []);
 
-  useEffect(() => {
-    const loadFriends = () => {
-      agent.Friendship.getFriends()
-        .then(setFriends)
-        .catch(() => {});
-    };
-    loadFriends();
-    window.addEventListener("friendRequestAccepted", loadFriends);
-    window.addEventListener("friendRemoved", loadFriends);
-    window.addEventListener("blockStatusChanged", loadFriends);
-    return () => {
-      window.removeEventListener("friendRequestAccepted", loadFriends);
-      window.removeEventListener("friendRemoved", loadFriends);
-      window.removeEventListener("blockStatusChanged", loadFriends);
-    };
-  }, []);
+  const term = searchTerm.trim().toLocaleLowerCase("tr");
 
-  const otherUsers = users.filter((u) => u.userName !== currentUser?.userName);
-
-  const filteredUsers = otherUsers.filter((u) =>
-    u.fullName.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const onlineUsersList = friends.filter(
-    (u) => onlineUsers.includes(u.id) && !blockedIds.includes(u.id),
+  const filteredUsers = useMemo(
+    () =>
+      term
+        ? users.filter(
+            (u) =>
+              u.fullName.toLocaleLowerCase("tr").includes(term) ||
+              u.userName.toLocaleLowerCase("tr").includes(term),
+          )
+        : users,
+    [users, term],
   );
 
   const isUserOnline = (id: string) =>
     onlineUsers.includes(id) && !blockedIds.includes(id);
 
-  const unreadCount = (id: string) => unreadCounts[id] || 0;
+  const onlineFriends = friends.filter((u) => isUserOnline(u.id));
 
-  // Sohbeti sil (benim için)
+  const openChat = (id: string) => {
+    if (activeConversationId !== id || isRoom) {
+      navigate(`/chat/${id}`);
+    }
+  };
+
   const confirmDelete = (u: IUser) => {
     Modal.confirm({
       title: "Sohbeti Sil",
-      content: `"${u.fullName}" ile olan sohbeti silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+      content: `"${u.fullName}" ile olan sohbet sizin için silinecek. Yeni mesaj gelirse sohbet tekrar görünür.`,
       okText: "Sil",
       okType: "danger",
       cancelText: "İptal",
@@ -126,26 +167,127 @@ export default function ChatsPanel() {
         try {
           await agent.Message.deleteConversation(u.id);
           setUsers((prev) => prev.filter((usr) => usr.id !== u.id));
-          // Eğer o sohbet açıksa kapat
           if (activeConversationId === u.id) {
             dispatch(clearActiveConversation());
             navigate("/");
           }
           antdMessage.success("Sohbet silindi");
-        } catch {
-          antdMessage.error("Sohbet silinemedi");
+        } catch (error) {
+          antdMessage.error(getApiError(error, "Sohbet silinemedi"));
         }
       },
     });
   };
 
-  // Mobil long-press
   const startLongPress = (u: IUser) => {
     longPressTimer.current = setTimeout(() => setLongPressUser(u), 450);
   };
 
   const cancelLongPress = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  const renderList = () => {
+    if (loading) return showSkeleton ? <ChatListSkeleton /> : null;
+
+    if (filteredUsers.length === 0) {
+      return (
+        <Text className="chats-panel-empty">
+          {term
+            ? "Sonuç bulunamadı."
+            : "Henüz sohbet yok. Kişiler sekmesinden bir arkadaşınla sohbet başlatabilirsin."}
+        </Text>
+      );
+    }
+
+    return filteredUsers.map((u, index) => {
+      const count = unreadCounts[u.id] || 0;
+      const unread = count > 0;
+      const online = isUserOnline(u.id);
+      const active = !isRoom && activeConversationId === u.id;
+      const isLongPressed = longPressUser?.id === u.id;
+
+      return (
+        <div
+          key={u.id}
+          className={`chats-panel-item anim anim-fade-up ${active ? "active" : ""} ${isLongPressed ? "long-pressed" : ""} ${unread ? "is-unread" : ""}`}
+          style={stagger(index)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (longPressUser) {
+              setLongPressUser(null);
+              return;
+            }
+            openChat(u.id);
+          }}
+          onTouchStart={() => startLongPress(u)}
+          onTouchEnd={cancelLongPress}
+          onTouchMove={cancelLongPress}
+        >
+          <Badge dot={online} color="#52c41a" offset={[-4, 36]}>
+            <Avatar size={42} src={avatarUrl(u.avatar)} className="chats-avatar">
+              {u.fullName.charAt(0).toUpperCase()}
+            </Avatar>
+          </Badge>
+
+          <div className="chats-panel-item-info">
+            <Text className="chats-panel-item-name">{u.fullName}</Text>
+            <Text
+              className={`chats-panel-item-status ${unread || online ? "is-highlight" : ""}`}
+            >
+              {unread
+                ? `${count} yeni mesaj`
+                : online
+                  ? "çevrimiçi"
+                  : formatLastSeen(u.lastSeen)}
+            </Text>
+          </div>
+
+          {unread && <span className="chats-unread-badge anim anim-pop">{count}</span>}
+
+          <div
+            className="chats-item-more header-desktop-icon"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              menu={{
+                items: [
+                  {
+                    key: "delete",
+                    label: "Sohbeti Sil",
+                    icon: <DeleteOutlined />,
+                    danger: true,
+                    onClick: () => confirmDelete(u),
+                  },
+                ],
+              }}
+            >
+              <MoreOutlined className="chats-item-more-icon" />
+            </Dropdown>
+          </div>
+
+          {isLongPressed && (
+            <div
+              className="chats-longpress-menu anim anim-pop"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="chats-longpress-item danger"
+                onClick={() => {
+                  setLongPressUser(null);
+                  confirmDelete(u);
+                }}
+              >
+                <DeleteOutlined />
+                <span>Sohbeti Sil</span>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -156,199 +298,50 @@ export default function ChatsPanel() {
         navigate("/");
       }}
     >
-      {/* Mobil long-press menüsü açıkken overlay */}
       {longPressUser && (
-        <div
-          onClick={() => setLongPressUser(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 1000 }}
-        />
+        <div className="chats-overlay" onClick={() => setLongPressUser(null)} />
       )}
 
-      <div className="chats-panel-header">Chats</div>
+      <div className="chats-panel-header">Sohbetler</div>
 
       <div className="chats-panel-search" onClick={(e) => e.stopPropagation()}>
         <Input
-          prefix={<SearchOutlined style={{ color: "#b0aec8" }} />}
-          placeholder="Search messages or users"
+          prefix={<SearchOutlined className="chats-search-icon" />}
+          placeholder="Sohbetlerde ara"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          maxLength={50}
+          allowClear
         />
       </div>
 
-      {/* Online kullanıcılar (arkadaş listemden) */}
-      <div className="chats-panel-online">
-        {onlineUsersList.length > 0 ? (
-          onlineUsersList.map((u) => (
-            <div
-              key={u.userName}
-              className="online-user-card"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (activeConversationId !== u.id) {
-                  navigate(`/chat/${u.id}`);
-                }
-              }}
-            >
-              <div className="online-user-avatar-wrapper">
-                <Avatar
-                  size={44}
-                  src={avatarUrl(u.avatar)}
-                  style={{
-                    background: "var(--color-primary)",
-                    fontSize: 16,
-                    fontWeight: 600,
-                  }}
-                >
-                  {u.fullName.charAt(0)}
-                </Avatar>
-                <div className="online-user-dot" />
-              </div>
-              <Text className="online-user-name">{u.fullName}</Text>
-            </div>
-          ))
-        ) : (
-          <Text style={{ fontSize: 12, color: "#aaa", padding: "0 4px" }}>
-            Online kullanıcı yok
-          </Text>
-        )}
-      </div>
-
-      <div className="chats-panel-recent-title">Recent</div>
-
-      {/* Kullanıcı listesi (yazıştıklarım) */}
-      <div className="chats-panel-list">
-        {filteredUsers.length > 0 ? (
-          filteredUsers.map((u) => {
-            const count = unreadCount(u.id);
-            const unread = count > 0;
-            const isLongPressed = longPressUser?.id === u.id;
-
-            return (
-              <div
-                key={u.userName}
-                className={`chats-panel-item ${activeConversationId === u.id ? "active" : ""} ${isLongPressed ? "long-pressed" : ""}`}
-                style={{ position: "relative" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (longPressUser) {
-                    setLongPressUser(null);
-                    return;
-                  }
-                  if (activeConversationId !== u.id) {
-                    navigate(`/chat/${u.id}`);
-                  }
-                }}
-                onTouchStart={() => startLongPress(u)}
-                onTouchEnd={cancelLongPress}
-                onTouchMove={cancelLongPress}
+      {onlineFriends.length > 0 && (
+        <>
+          <div className="chats-section-title">Çevrimiçi</div>
+          <div className="chats-panel-online" onClick={(e) => e.stopPropagation()}>
+            {onlineFriends.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className="online-user-card anim anim-pop"
+                onClick={() => openChat(u.id)}
               >
-                <Badge
-                  dot
-                  color={isUserOnline(u.id) ? "#52c41a" : "transparent"}
-                  offset={[-3, 38]}
-                >
-                  <Avatar
-                    size={42}
-                    src={avatarUrl(u.avatar)}
-                    style={{
-                      background: "var(--color-primary)",
-                      flexShrink: 0,
-                      fontSize: 16,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {u.fullName.charAt(0)}
+                <div className="online-user-avatar-wrapper">
+                  <Avatar size={44} src={avatarUrl(u.avatar)} className="online-user-avatar">
+                    {u.fullName.charAt(0).toUpperCase()}
                   </Avatar>
-                </Badge>
-                <div className="chats-panel-item-info">
-                  <div className="chats-panel-item-top">
-                    <Text
-                      className="chats-panel-item-name"
-                      style={{
-                        fontWeight: unread ? 800 : 600,
-                        color: unread ? "#111" : undefined,
-                      }}
-                    >
-                      {u.fullName}
-                    </Text>
-                  </div>
-                  <div className="chats-panel-item-bottom">
-                    <Text
-                      className="chats-panel-item-last-msg"
-                      style={{
-                        color: unread
-                          ? "var(--color-primary)"
-                          : isUserOnline(u.id)
-                            ? "var(--color-primary)"
-                            : "#aaa",
-                        fontWeight: unread ? 700 : 400,
-                        fontSize: unread ? 13 : undefined,
-                      }}
-                    >
-                      {unread
-                        ? `${count} yeni mesaj`
-                        : isUserOnline(u.id)
-                          ? "çevrimiçi"
-                          : formatLastSeen(u.lastSeen)}
-                    </Text>
-                  </div>
+                  <span className="online-user-dot" />
                 </div>
+                <Text className="online-user-name">{u.fullName}</Text>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
-                {unread && <span className="chats-unread-badge">{count}</span>}
+      <div className="chats-section-title">Son sohbetler</div>
 
-                {/* Masaüstü: 3 nokta (hover'da görünür) */}
-                <div
-                  className="chats-item-more header-desktop-icon"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Dropdown
-                    trigger={["click"]}
-                    placement="bottomRight"
-                    menu={{
-                      items: [
-                        {
-                          key: "delete",
-                          label: "Sohbeti Sil",
-                          icon: <DeleteOutlined />,
-                          danger: true,
-                          onClick: () => confirmDelete(u),
-                        },
-                      ],
-                    }}
-                  >
-                    <MoreOutlined
-                      style={{ fontSize: 16, color: "#aaa", padding: 4 }}
-                    />
-                  </Dropdown>
-                </div>
-
-                {/* Mobil: long-press menüsü */}
-                {isLongPressed && (
-                  <div
-                    className="chats-longpress-menu"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div
-                      className="chats-longpress-item danger"
-                      onClick={() => {
-                        setLongPressUser(null);
-                        confirmDelete(u);
-                      }}
-                    >
-                      <DeleteOutlined />
-                      <span>Sohbeti Sil</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        ) : (
-          <Text style={{ fontSize: 12, color: "#aaa", padding: "0 4px" }}>
-            Kullanıcı bulunamadı
-          </Text>
-        )}
-      </div>
+      <div className="chats-panel-list">{renderList()}</div>
     </div>
   );
 }

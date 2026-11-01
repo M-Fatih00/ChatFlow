@@ -1,11 +1,11 @@
-import { Input, Button, Checkbox, Card, Typography } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
-import { useForm, Controller } from "react-hook-form";
+import { useState, type CSSProperties } from "react";
+import { Alert, Button, Card, Checkbox, Input, Typography } from "antd";
+import { LockOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
+import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/store";
 import { loginUser } from "./authSlice";
 import type { ILoginForm } from "../../models/ILoginForm";
-import { useState } from "react";
 
 const { Title, Text } = Typography;
 
@@ -20,49 +20,44 @@ export default function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<ILoginForm>({
-    defaultValues: { rememberMe: false },
+    defaultValues: { userName: "", password: "", rememberMe: false },
   });
 
   const onSubmit = async (data: ILoginForm) => {
     setServerError(null);
-    const trimmedData = { ...data, userName: data.userName.trim() };
-    const result = await dispatch(loginUser(trimmedData));
+    const result = await dispatch(
+      loginUser({ ...data, userName: data.userName.trim() }),
+    );
+
     if (loginUser.fulfilled.match(result)) {
-      navigate("/");
+      navigate("/", { replace: true });
     } else {
-      setServerError("Kullanıcı adı veya şifre hatalı");
+      setServerError(result.payload ?? "Kullanıcı adı veya şifre hatalı.");
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-auth-bg)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
-    >
-      <div style={{ marginBottom: 24, textAlign: "center" }}>
-        <Title level={3} style={{ margin: 0 }}>
-          ChatFlow
+    <div style={styles.page}>
+      <div style={styles.brand} className="anim anim-fade-down">
+        <div style={styles.logo}>
+          <MessageOutlined style={{ fontSize: 26, color: "#fff" }} />
+        </div>
+        <Title level={3} style={{ margin: "12px 0 4px" }}>
+          ChatFlow'a hoş geldin
         </Title>
+        <Text type="secondary">Devam etmek için giriş yap.</Text>
       </div>
 
-      <Title level={3} style={{ marginBottom: 4 }}>
-        Sign in
-      </Title>
-      <Text type="secondary" style={{ marginBottom: 24 }}>
-        Sign in to continue to ChatFlow.
-      </Text>
-
-      <Card style={{ width: "100%", maxWidth: 420, borderRadius: 12 }}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div style={{ marginBottom: 16 }}>
-            <Text strong>Username</Text>
+      <Card
+        className="anim anim-fade-up"
+        style={{ ...styles.card, animationDelay: "80ms" }}
+        styles={{ body: { padding: 28 } }}
+      >
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div style={styles.field}>
+            <label htmlFor="userName">
+              <Text strong>Kullanıcı adı</Text>
+            </label>
             <Controller
               name="userName"
               control={control}
@@ -70,26 +65,28 @@ export default function LoginPage() {
               render={({ field }) => (
                 <Input
                   {...field}
+                  id="userName"
                   prefix={<UserOutlined />}
-                  placeholder="Enter Username"
+                  placeholder="kullaniciadi"
                   size="large"
-                  style={{ marginTop: 6 }}
+                  autoComplete="username"
+                  maxLength={64}
+                  style={styles.input}
                   status={errors.userName ? "error" : ""}
                 />
               )}
             />
             {errors.userName && (
-              <Text type="danger">{errors.userName.message}</Text>
+              <Text type="danger" style={styles.error}>
+                {errors.userName.message}
+              </Text>
             )}
           </div>
 
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Text strong>Password</Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Forgot password?
-              </Text>
-            </div>
+          <div style={styles.field}>
+            <label htmlFor="password">
+              <Text strong>Şifre</Text>
+            </label>
             <Controller
               name="password"
               control={control}
@@ -97,16 +94,21 @@ export default function LoginPage() {
               render={({ field }) => (
                 <Input.Password
                   {...field}
+                  id="password"
                   prefix={<LockOutlined />}
-                  placeholder="Enter Password"
+                  placeholder="••••••••"
                   size="large"
-                  style={{ marginTop: 6 }}
+                  autoComplete="current-password"
+                  maxLength={128}
+                  style={styles.input}
                   status={errors.password ? "error" : ""}
                 />
               )}
             />
             {errors.password && (
-              <Text type="danger">{errors.password.message}</Text>
+              <Text type="danger" style={styles.error}>
+                {errors.password.message}
+              </Text>
             )}
           </div>
 
@@ -117,27 +119,20 @@ export default function LoginPage() {
               <Checkbox
                 checked={field.value}
                 onChange={(e) => field.onChange(e.target.checked)}
-                style={{ marginBottom: 16 }}
+                style={{ marginBottom: 20 }}
               >
-                Remember me
+                Beni hatırla
               </Checkbox>
             )}
           />
 
           {serverError && (
-            <div
-              style={{
-                marginBottom: 16,
-                padding: "10px 14px",
-                background: "#fff2f0",
-                border: "1px solid #ffccc7",
-                borderRadius: 8,
-              }}
-            >
-              <Text type="danger" style={{ fontSize: 13 }}>
-                {serverError}
-              </Text>
-            </div>
+            <Alert
+              type="error"
+              message={serverError}
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
           )}
 
           <Button
@@ -146,26 +141,69 @@ export default function LoginPage() {
             size="large"
             block
             loading={loginLoading}
-            style={{
-              background: "var(--color-primary)",
-              borderColor: "var(--color-primary)",
-            }}
+            style={styles.submit}
           >
-            Sign in
+            Giriş yap
           </Button>
         </form>
       </Card>
 
-      <div style={{ marginTop: 24, textAlign: "center" }}>
-        <Text type="secondary">Don't have an account? </Text>
-        <Link to="/register" style={{ color: "var(--color-primary)" }}>
-          Signup now
+      <div style={{ marginTop: 24 }}>
+        <Text type="secondary">Hesabın yok mu? </Text>
+        <Link to="/register" style={styles.link}>
+          Hemen kaydol
         </Link>
       </div>
 
-      <Text type="secondary" style={{ marginTop: 16, fontSize: 12 }}>
-        © 2024 ChatFlow. Crafted with ❤️
+      <Text type="secondary" style={styles.footer}>
+        © {new Date().getFullYear()} ChatFlow
       </Text>
     </div>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100dvh",
+    background: "var(--color-auth-bg)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  brand: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    background: "var(--color-primary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.06)",
+  },
+  field: { marginBottom: 16 },
+  input: { marginTop: 6 },
+  error: { display: "block", marginTop: 4, fontSize: 12 },
+  submit: {
+    background: "var(--color-primary)",
+    borderColor: "var(--color-primary)",
+    height: 46,
+    fontWeight: 600,
+  },
+  link: { color: "var(--color-primary)", fontWeight: 600 },
+  footer: { marginTop: 16, fontSize: 12 },
+};

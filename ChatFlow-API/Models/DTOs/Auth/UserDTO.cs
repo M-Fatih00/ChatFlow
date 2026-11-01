@@ -8,9 +8,5 @@ public class UserDTO
     public string? Email { get; set; }
     public string? Avatar { get; set; }
     public string? Bio { get; set; }
-    public string? Token { get; set; }
-    public DateTime? LastSeen { get; set; }
-    public bool IsOnline { get; set; }
     public DateTime CreatedAt { get; set; }
-
 }

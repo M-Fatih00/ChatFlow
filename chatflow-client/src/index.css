@@ -20,6 +20,12 @@
   --color-read: #166534;
 }
 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
 body, html, #root {
     height: 100%;
     overflow: hidden;

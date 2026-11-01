@@ -5,6 +5,7 @@ using ChatFlow.API.Service;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ChatFlow.API.Controllers;
 
@@ -12,136 +13,155 @@ namespace ChatFlow.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private const string InvalidCredentialsMessage = "Kullanıcı adı veya şifre hatalı.";
 
     private readonly UserManager<User> _userManager;
+    private readonly SignInManager<User> _signInManager;
     private readonly TokenService _tokenService;
-    private readonly IWebHostEnvironment _env;
-    public AuthController(UserManager<User> userManager, TokenService tokenService, IWebHostEnvironment env)
+    private readonly IConfiguration _config;
+
+    public AuthController(
+        UserManager<User> userManager,
+        SignInManager<User> signInManager,
+        TokenService tokenService,
+        IConfiguration config)
     {
         _userManager = userManager;
+        _signInManager = signInManager;
         _tokenService = tokenService;
-        _env = env;
+        _config = config;
     }
 
-
     [HttpPost("register")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Register(RegisterDTO dto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
         var user = new User
         {
-            FullName = dto.FullName,
-            UserName = dto.UserName,
-            Email = dto.Email,
-            CreatedAt = DateTime.UtcNow,
+            FullName = dto.FullName.Trim(),
+            UserName = dto.UserName.Trim(),
+            Email = dto.Email.Trim(),
+            CreatedAt = DateTime.UtcNow
         };
 
         var result = await _userManager.CreateAsync(user, dto.Password);
 
-        if (!result.Succeeded)
-            return BadRequest(new { message = "Kullanıcı Oluşturulamadı." });
+        if (result.Succeeded)
+            return Ok(new { message = "Kayıt başarılı! Şimdi giriş yapabilirsiniz." });
 
-        return Ok(new { message = "Kayıt başarılı!" });
+        if (result.Errors.Any(e => e.Code.StartsWith("Password", StringComparison.Ordinal)))
+            return BadRequest(new { message = "Şifre en az 8 karakter olmalı, en az bir küçük harf ve bir rakam içermelidir." });
 
+        return BadRequest(new { message = "Kayıt oluşturulamadı. Kullanıcı adı veya e-posta kullanımda olabilir." });
     }
-
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(LoginDTO dto)
     {
-        var user = await _userManager.FindByNameAsync(dto.UserName);
+        var user = await _userManager.FindByNameAsync(dto.UserName.Trim());
 
-        var result = user != null && await _userManager.CheckPasswordAsync(user, dto.Password);
-
-        if (!result)
-            return BadRequest(new { message = "Kullanıcı adı veya Şifre hatalı." });
-
-        var token = await _tokenService.GenerateToken(user!);
-
-        Response.Cookies.Append("jwt", token, new CookieOptions
+        if (user == null)
         {
-            HttpOnly = true,
-            SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
-            Secure = !_env.IsDevelopment(),
-            Expires = dto.RememberMe
-        ? DateTimeOffset.UtcNow.AddDays(15)
-        : DateTimeOffset.UtcNow.AddHours(8) // remember me yoksa 8 saat
-        });
+            _userManager.PasswordHasher.HashPassword(new User { FullName = string.Empty }, dto.Password);
+            return BadRequest(new { message = InvalidCredentialsMessage });
+        }
 
-        return Ok(new UserDTO
-        {
-            Id = user!.Id,
-            FullName = user!.FullName,
-            UserName = user.UserName!,
-            Email = user.Email,
-            Avatar = user.Avatar,
-            Bio = user.Bio,
-            Token = token
-        });
+        var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, lockoutOnFailure: true);
+
+        if (result.IsLockedOut)
+            return BadRequest(new { message = "Çok fazla hatalı deneme yapıldı. Lütfen 5 dakika sonra tekrar deneyin." });
+
+        if (!result.Succeeded)
+            return BadRequest(new { message = InvalidCredentialsMessage });
+
+        if (string.IsNullOrEmpty(user.SecurityStamp))
+            await _userManager.UpdateSecurityStampAsync(user);
+
+        await _tokenService.IssueAuthCookieAsync(Response, user, dto.RememberMe);
+
+        return Ok(ToUserDto(user));
     }
-
 
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        Response.Cookies.Delete("jwt", new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = !_env.IsDevelopment(),
-            SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
-        });
-
+        _tokenService.ClearAuthCookie(Response);
         return Ok();
     }
 
+    [Authorize]
+    [HttpPost("logout-all")]
+    public async Task<IActionResult> LogoutAll()
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+            return Unauthorized();
+
+        await _userManager.UpdateSecurityStampAsync(user);
+        _tokenService.ForgetSecurityStamp(user.Id);
+        _tokenService.ClearAuthCookie(Response);
+
+        return Ok(new { message = "Tüm cihazlardaki oturumlar kapatıldı." });
+    }
 
     [Authorize]
     [HttpGet("me")]
     public async Task<IActionResult> GetCurrentUser()
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value!;
-        var user = await _userManager.FindByIdAsync(userId);
-
+        var user = await GetCurrentUserAsync();
         if (user == null)
             return Unauthorized();
 
-        var token = await _tokenService.GenerateToken(user);
-
-        return Ok(new UserDTO
-        {
-            Id = user.Id,
-            FullName = user.FullName,
-            UserName = user.UserName!,
-            Email = user.Email,
-            Avatar = user.Avatar,
-            Bio = user.Bio,
-            CreatedAt = user.CreatedAt,
-            Token = token
-        });
+        return Ok(ToUserDto(user));
     }
-
 
     [Authorize]
     [HttpPost("change-password")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword(ChangePasswordDTO dto)
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value!;
-        var user = await _userManager.FindByIdAsync(userId);
-
+        var user = await GetCurrentUserAsync();
         if (user == null)
             return Unauthorized();
 
-        var result = await _userManager.ChangePasswordAsync(
-            user,
-            dto.CurrentPassword,
-            dto.NewPassword
-        );
+        if (IsDemoAccount(user))
+            return BadRequest(new { message = "Demo hesaplarında şifre değiştirilemez." });
+
+        if (dto.CurrentPassword == dto.NewPassword)
+            return BadRequest(new { message = "Yeni şifre mevcut şifreyle aynı olamaz." });
+
+        var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
 
         if (!result.Succeeded)
-            return BadRequest(new { message = "Mevcut şifre hatalı veya yeni şifre geçersiz." });
+            return BadRequest(new { message = "Mevcut şifre hatalı veya yeni şifre kurallara uymuyor." });
 
-        return Ok(new { message = "Şifre başarıyla değiştirildi." });
+        var rememberMe = User.FindFirstValue(TokenService.RememberMeClaim) == "1";
+        await _tokenService.IssueAuthCookieAsync(Response, user, rememberMe);
+
+        return Ok(new { message = "Şifre değiştirildi. Diğer cihazlardaki oturumlar kapatıldı." });
     }
+
+    private async Task<User?> GetCurrentUserAsync()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return userId == null ? null : await _userManager.FindByIdAsync(userId);
+    }
+
+    private bool IsDemoAccount(User user)
+    {
+        var demoUserNames = _config.GetSection("DemoAccounts:UserNames").Get<string[]>() ?? Array.Empty<string>();
+        return demoUserNames.Contains(user.UserName, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static UserDTO ToUserDto(User user) => new()
+    {
+        Id = user.Id,
+        FullName = user.FullName,
+        UserName = user.UserName!,
+        Email = user.Email,
+        Avatar = user.Avatar,
+        Bio = user.Bio,
+        CreatedAt = user.CreatedAt
+    };
 }

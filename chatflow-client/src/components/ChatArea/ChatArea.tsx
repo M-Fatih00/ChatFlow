@@ -1,26 +1,82 @@
-import { Avatar, message, Spin } from "antd";
+import { Avatar, message } from "antd";
+import { MessageOutlined } from "@ant-design/icons";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MessageInput from "../MessageInput/MessageInput";
 import ChatHeader from "./ChatHeader";
 import MessageBubble from "./MessageBubble";
 import MembersModal from "./MembersModal";
 import AddMemberModal from "./AddMemberModal";
 import UserDetailPanel from "../../features/profile/UserDetailPanel";
-import { useEffect, useLayoutEffect, useState, useRef } from "react";
-import { useAppSelector, useAppDispatch } from "../../store/store";
+import GroupDetailPanel from "../../features/groups/GroupDetailPanel";
+import { useAppDispatch, useAppSelector } from "../../store/store";
 import agent from "../../api/requests";
 import {
-  setMessages,
   clearActiveConversation,
+  setMessages,
 } from "../../features/chats/chatSlice";
 import type { IUser } from "../../models/IUser";
 import type { IRoom } from "../../models/IRoom";
 import type { IRoomMember } from "../../models/IRoomMember";
 import { signalRService } from "../../api/signalRService";
-import GroupDetailPanel from "../../features/groups/GroupDetailPanel";
 import { avatarUrl } from "../../utils/avatarUrl";
-import { useNavigate } from "react-router-dom";
-import { MessageOutlined } from "@ant-design/icons";
+import { getApiError } from "../../utils/apiError";
+import Animate from "../Animate/Animate";
+import type { IMessage } from "../../models/IMessage";
+import { cache } from "../../utils/cache";
+import { useDelayedLoading } from "../../utils/useDelayedLoading";
 import "./ChatArea.css";
+
+const SKELETON_ROWS: { side: "left" | "right"; width: string }[] = [
+  { side: "left", width: "55%" },
+  { side: "right", width: "38%" },
+  { side: "left", width: "42%" },
+  { side: "left", width: "64%" },
+  { side: "right", width: "50%" },
+  { side: "right", width: "30%" },
+  { side: "left", width: "46%" },
+];
+
+function MessagesSkeleton() {
+  return (
+    <div className="chat-skeleton" aria-label="Mesajlar yükleniyor">
+      {SKELETON_ROWS.map((row, index) => (
+        <div key={index} className={`chat-skeleton-row is-${row.side}`}>
+          {row.side === "left" && <div className="chat-skeleton-avatar" />}
+          <div className="chat-skeleton-bubble" style={{ width: row.width }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WelcomeScreen() {
+  return (
+    <div className="chat-welcome">
+      <div className="es-wrap">
+        <div className="es-icon-area">
+          <div className="es-pulse" />
+          <div className="es-pulse" />
+          <div className="es-pulse" />
+          <div className="es-chat-icon">
+            <MessageOutlined className="es-chat-icon-svg" />
+            <div className="es-mini-bubble es-mb1" />
+            <div className="es-mini-bubble es-mb2" />
+          </div>
+        </div>
+        <p className="es-title">ChatFlow'a hoş geldin</p>
+        <p className="es-subtitle">
+          Sohbet başlatmak için sol panelden bir kişi ya da grup seç.
+        </p>
+        <div className="es-dots">
+          <div className="es-dot" />
+          <div className="es-dot" />
+          <div className="es-dot" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ChatArea() {
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -28,6 +84,7 @@ export default function ChatArea() {
   const [loadingMore, setLoadingMore] = useState(false);
   const skipRef = useRef(0);
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { messages, activeConversationId, isRoom, onlineUsers, typingUsers } =
     useAppSelector((state) => state.chat);
   const { user: currentUser } = useAppSelector((state) => state.auth);
@@ -41,29 +98,27 @@ export default function ChatArea() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
-  const navigate = useNavigate();
   const isPrependingRef = useRef(false);
   const wasNearBottomRef = useRef(true);
 
-  // Engelleme durumu
   const [iBlocked, setIBlocked] = useState(false);
   const [blockedByThem, setBlockedByThem] = useState(false);
   const isBlocked = iBlocked || blockedByThem;
 
-  // Üye yönetimi
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState<IRoomMember[]>([]);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<IUser[]>([]);
   const [selectedNewMembers, setSelectedNewMembers] = useState<string[]>([]);
 
-  // Sohbet içi arama
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
 
-  // Kişi detay paneli
   const [detailOpen, setDetailOpen] = useState(false);
+  const [baselineMessageId, setBaselineMessageId] = useState(0);
+
+  const showSkeleton = useDelayedLoading(messagesLoading);
 
   const currentMember = members.find((m) => m.userId === currentUser?.id);
   const isCurrentUserAdmin = currentMember?.isAdmin ?? false;
@@ -88,24 +143,38 @@ export default function ChatArea() {
     if (!activeConversationId) return;
 
     let cancelled = false;
+    const key = `messages:${isRoom ? "room" : "user"}:${activeConversationId}`;
+    const cached = cache.get<{ messages: IMessage[]; hasMore: boolean }>(key);
+    const highestId = (list: IMessage[]) =>
+      list.reduce((max, m) => Math.max(max, m.id), 0);
 
     markedRef.current = new Set();
     deliveredRef.current = new Set();
     isFirstScrollRef.current = true;
 
-    setMessagesLoading(true);
-    skipRef.current = 0;
+    if (cached) {
+      dispatch(setMessages(cached.messages));
+      setHasMore(cached.hasMore);
+      setBaselineMessageId(highestId(cached.messages));
+      skipRef.current = cached.messages.length;
+      setMessagesLoading(false);
+    } else {
+      skipRef.current = 0;
+      setMessagesLoading(true);
+    }
 
     agent.Message.getMessages(
       isRoom ? undefined : activeConversationId,
       isRoom ? Number(activeConversationId) : undefined,
       0,
     )
-      .then((res: { messages: any[]; hasMore: boolean }) => {
+      .then((res: { messages: IMessage[]; hasMore: boolean }) => {
         if (cancelled) return;
         dispatch(setMessages(res.messages));
         setHasMore(res.hasMore);
+        setBaselineMessageId(highestId(res.messages));
         skipRef.current = res.messages.length;
+        cache.set(key, res);
       })
       .catch(() => {
         if (!cancelled && isRoom) {
@@ -121,30 +190,39 @@ export default function ChatArea() {
       });
 
     if (isRoom) {
+      const roomId = Number(activeConversationId);
       setActiveUser(null);
-      signalRService.joinRoom(Number(activeConversationId));
-      agent.Room.getRoom(Number(activeConversationId))
+      setActiveRoom(cache.get<IRoom>(`room:${roomId}`) ?? null);
+      setMembers(cache.get<IRoomMember[]>(`members:${roomId}`) ?? []);
+      signalRService.joinRoom(roomId);
+
+      agent.Room.getRoom(roomId)
         .then((room: IRoom) => {
           if (cancelled) return;
+          cache.set(`room:${roomId}`, room);
           setActiveRoom(room);
         })
-        .catch(() => {});
-      agent.Room.getMembers(Number(activeConversationId))
+        .catch(() => undefined);
+
+      agent.Room.getMembers(roomId)
         .then((mem: IRoomMember[]) => {
           if (cancelled) return;
+          cache.set(`members:${roomId}`, mem);
           setMembers(mem);
         })
-        .catch(() => {});
+        .catch(() => undefined);
     } else {
       setActiveRoom(null);
       setMembers([]);
-      agent.User.getUsers()
-        .then((users: IUser[]) => {
+      setActiveUser(cache.get<IUser>(`user:${activeConversationId}`) ?? null);
+
+      agent.User.getById(activeConversationId)
+        .then((user: IUser) => {
           if (cancelled) return;
-          const found = users.find((u) => u.id === activeConversationId);
-          setActiveUser(found ?? null);
+          cache.set(`user:${user.id}`, user);
+          setActiveUser(user);
         })
-        .catch(() => {});
+        .catch(() => undefined);
     }
 
     return () => {
@@ -157,75 +235,81 @@ export default function ChatArea() {
     setSearchQuery("");
     setMatchIndex(0);
     setDetailOpen(false);
+    setShowScrollButton(false);
+    setHasNewMessage(false);
+    wasNearBottomRef.current = true;
   }, [activeConversationId]);
 
-  // Engel durumunu çek (bireysel sohbet)
   useEffect(() => {
     if (!activeConversationId || isRoom) {
       setIBlocked(false);
       setBlockedByThem(false);
       return;
     }
+
+    let cancelled = false;
+
     agent.Block.getStatus(activeConversationId)
       .then((res: { iBlocked: boolean; blockedByThem: boolean }) => {
+        if (cancelled) return;
         setIBlocked(res.iBlocked);
         setBlockedByThem(res.blockedByThem);
       })
-      .catch(() => {});
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeConversationId, isRoom]);
 
-  // Detay panelinden engel değişince header + mesaj kutusu güncellensin
   useEffect(() => {
     const handler = (e: Event) => {
       const { userId } = (e as CustomEvent).detail;
       if (activeConversationId && userId === activeConversationId && !isRoom) {
-        agent.Block.getStatus(activeConversationId).then(
-          (res: { iBlocked: boolean; blockedByThem: boolean }) => {
+        agent.Block.getStatus(activeConversationId)
+          .then((res: { iBlocked: boolean; blockedByThem: boolean }) => {
             setIBlocked(res.iBlocked);
             setBlockedByThem(res.blockedByThem);
-          },
-        );
+          })
+          .catch(() => undefined);
       }
     };
     window.addEventListener("blockStatusChanged", handler);
     return () => window.removeEventListener("blockStatusChanged", handler);
   }, [activeConversationId, isRoom]);
 
-  // Mesajlar değişince okundu yap (sadece bireysel sohbette)
   useEffect(() => {
     if (!activeConversationId || isRoom) return;
 
-    const unreadFromOther = messages.filter(
-      (m) =>
-        m.senderId === activeConversationId &&
-        !m.isRead &&
-        !markedRef.current.has(m.id),
-    );
-
-    unreadFromOther.forEach((m) => {
-      markedRef.current.add(m.id);
-      signalRService.markAsRead(m.id, m.senderId);
-    });
+    messages
+      .filter(
+        (m) =>
+          m.senderId === activeConversationId &&
+          !m.isRead &&
+          !markedRef.current.has(m.id),
+      )
+      .forEach((m) => {
+        markedRef.current.add(m.id);
+        signalRService.markAsRead(m.id, m.senderId);
+      });
   }, [messages, activeConversationId, isRoom]);
 
-  // Grup mesajlarını okundu yap (başkasının gönderdiği, henüz işaretlenmemiş)
   useEffect(() => {
     if (!activeConversationId || !isRoom) return;
 
-    const unreadFromOthers = messages.filter(
-      (m) =>
-        m.senderId !== currentUser?.id &&
-        !m.isDeleted &&
-        !markedRef.current.has(m.id),
-    );
-
-    unreadFromOthers.forEach((m) => {
-      markedRef.current.add(m.id);
-      signalRService.markAsRead(m.id, m.senderId);
-    });
+    messages
+      .filter(
+        (m) =>
+          m.senderId !== currentUser?.id &&
+          !m.isDeleted &&
+          !markedRef.current.has(m.id),
+      )
+      .forEach((m) => {
+        markedRef.current.add(m.id);
+        signalRService.markAsRead(m.id, m.senderId);
+      });
   }, [messages, activeConversationId, isRoom, currentUser?.id]);
 
-  // Grup mesajlarını "iletildi" işaretle (başkasının gönderdiği, henüz işaretlenmemiş)
   useEffect(() => {
     if (!activeConversationId || !isRoom) return;
 
@@ -242,12 +326,9 @@ export default function ChatArea() {
       });
   }, [messages, activeConversationId, isRoom, currentUser?.id]);
 
-  // Scroll yönetimi
   useLayoutEffect(() => {
     const container = messagesContainerRef.current;
     if (!container || messages.length === 0) return;
-
-    // Mesajlar hala yükleniyorsa (Spin gösteriliyor, mesajlar DOM'da değil) bekle
     if (messagesLoading) return;
 
     if (isPrependingRef.current) {
@@ -263,7 +344,6 @@ export default function ChatArea() {
       return;
     }
 
-    // Mesaj SAYISI artmadıysa (reaksiyon, tik, silme gibi güncelleme) → scroll etme
     if (messages.length <= prevMessageCountRef.current) {
       prevMessageCountRef.current = messages.length;
       return;
@@ -273,14 +353,7 @@ export default function ChatArea() {
     const lastMessage = messages[messages.length - 1];
     const isMyMessage = lastMessage?.senderId === currentUser?.id;
 
-    if (isMyMessage) {
-      container.scrollTop = container.scrollHeight;
-      setHasNewMessage(false);
-      return;
-    }
-
-    // Karşı taraf mesajı: mesaj GELMEDEN ÖNCE en altta mıydık?
-    if (wasNearBottomRef.current) {
+    if (isMyMessage || wasNearBottomRef.current) {
       container.scrollTop = container.scrollHeight;
       setHasNewMessage(false);
     } else {
@@ -296,11 +369,10 @@ export default function ChatArea() {
       const distance =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       const isNearBottom = distance < 150;
-      wasNearBottomRef.current = isNearBottom; 
+      wasNearBottomRef.current = isNearBottom;
       setShowScrollButton(!isNearBottom);
       if (isNearBottom) setHasNewMessage(false);
 
-      // Scroll gerçekten varsa VE en üste yaklaşıldıysa önceki mesajları yükle
       const hasScroll = container.scrollHeight > container.clientHeight + 50;
       if (hasScroll && container.scrollTop < 80) {
         loadMoreMessages();
@@ -314,15 +386,12 @@ export default function ChatArea() {
   useEffect(() => {
     if (activeMatchId == null) return;
     const el = document.getElementById(`message-${activeMatchId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeMatchId]);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const data = (e as CustomEvent).detail;
-      // Sadece şu an açık olan grup ise güncelle
       if (isRoom && activeRoom && data.id === activeRoom.id) {
         setActiveRoom((prev) =>
           prev
@@ -357,21 +426,25 @@ export default function ChatArea() {
 
   const openMembersModal = () => {
     if (!isRoom || !activeConversationId) return;
-    agent.Room.getMembers(Number(activeConversationId)).then(
-      (mem: IRoomMember[]) => {
+    agent.Room.getMembers(Number(activeConversationId))
+      .then((mem: IRoomMember[]) => {
         setMembers(mem);
         setMembersOpen(true);
-      },
-    );
+      })
+      .catch((error) => message.error(getApiError(error, "Üyeler alınamadı")));
   };
 
   const openAddMemberModal = () => {
-    agent.User.getUsers().then((users: IUser[]) => {
-      const memberIds = members.map((m) => m.userId);
-      setAllUsers(users.filter((u) => !memberIds.includes(u.id)));
-      setSelectedNewMembers([]);
-      setAddMemberOpen(true);
-    });
+    agent.Friendship.getFriends()
+      .then((friends: IUser[]) => {
+        const memberIds = new Set(members.map((m) => m.userId));
+        setAllUsers(friends.filter((f) => !memberIds.has(f.id)));
+        setSelectedNewMembers([]);
+        setAddMemberOpen(true);
+      })
+      .catch((error) =>
+        message.error(getApiError(error, "Arkadaş listesi alınamadı")),
+      );
   };
 
   const toggleNewMember = (userId: string) => {
@@ -392,9 +465,8 @@ export default function ChatArea() {
       setAddMemberOpen(false);
       const mem = await agent.Room.getMembers(Number(activeConversationId));
       setMembers(mem);
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message ?? "Üye eklenemedi";
-      message.error(errorMessage);
+    } catch (error) {
+      message.error(getApiError(error, "Üye eklenemedi"));
     }
   };
 
@@ -404,9 +476,8 @@ export default function ChatArea() {
       await agent.Room.removeMember(Number(activeConversationId), memberId);
       message.success("Üye çıkarıldı");
       setMembers((prev) => prev.filter((m) => m.userId !== memberId));
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message ?? "Üye çıkarılamadı";
-      message.error(errorMessage);
+    } catch (error) {
+      message.error(getApiError(error, "Üye çıkarılamadı"));
     }
   };
 
@@ -418,12 +489,11 @@ export default function ChatArea() {
       setMembers((prev) =>
         prev.map((m) => (m.userId === memberId ? { ...m, isAdmin: true } : m)),
       );
-    } catch {
-      message.error("Yöneticilik verilemedi (yetkiniz olmayabilir)");
+    } catch (error) {
+      message.error(getApiError(error, "Yöneticilik verilemedi"));
     }
   };
 
-  // Engelle / engeli kaldır (header'dan)
   const handleToggleBlock = async () => {
     if (!activeConversationId || isRoom) return;
     try {
@@ -441,8 +511,8 @@ export default function ChatArea() {
           detail: { userId: activeConversationId },
         }),
       );
-    } catch {
-      message.error("İşlem başarısız");
+    } catch (error) {
+      message.error(getApiError(error, "İşlem başarısız"));
     }
   };
 
@@ -452,88 +522,18 @@ export default function ChatArea() {
     setMatchIndex(0);
   };
 
-  // Aşağı ok: daha yeni mesaja (listede geriye, çünkü liste yeni→eski sıralı)
   const goToNextMatch = () => {
     if (matchingMessageIds.length === 0) return;
     setMatchIndex((prev) => Math.max(prev - 1, 0));
   };
 
-  // Yukarı ok: daha eski mesaja (listede ileriye)
   const goToPrevMatch = () => {
     if (matchingMessageIds.length === 0) return;
     setMatchIndex((prev) => Math.min(prev + 1, matchingMessageIds.length - 1));
   };
 
-  {
-    /* Hiçbir konuşma seçili değilken gösterilen animasyonlu karşılama ekranı */
-  }
   if (!activeConversationId) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#fff",
-        }}
-      >
-        <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-12px); }
-        }
-        @keyframes pulse-ring {
-          0% { transform: scale(0.8); opacity: 0.6; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-        @keyframes dot-bounce {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-6px); }
-        }
-        @keyframes es-fade-in {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .es-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; animation: es-fade-in 0.6s ease both; }
-        .es-icon-area { position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 28px; }
-        .es-pulse { position: absolute; width: 90px; height: 90px; border-radius: 50%; background: #166534; opacity: 0; animation: pulse-ring 2.4s ease-out infinite; }
-        .es-pulse:nth-child(2) { animation-delay: 0.8s; }
-        .es-pulse:nth-child(3) { animation-delay: 1.6s; }
-        .es-chat-icon { position: relative; width: 80px; height: 80px; background: #166534; border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: float 3.2s ease-in-out infinite; z-index: 1; }
-        .es-mini-bubble { position: absolute; background: #dcf0e4; border-radius: 10px 10px 0 10px; animation: float 2.8s ease-in-out infinite; }
-        .es-mb1 { width: 28px; height: 14px; top: 8px; right: 2px; animation-delay: 0.4s; }
-        .es-mb2 { width: 20px; height: 10px; top: 26px; right: -6px; border-radius: 8px 8px 0 8px; animation-delay: 0.9s; }
-        .es-title { font-size: 20px; font-weight: 500; color: #333; margin: 0 0 10px; text-align: center; }
-        .es-subtitle { font-size: 14px; color: #aaa; text-align: center; max-width: 240px; line-height: 1.6; margin: 0 0 28px; }
-        .es-dots { display: flex; gap: 7px; align-items: center; }
-        .es-dot { width: 7px; height: 7px; border-radius: 50%; background: #166534; opacity: 0.35; animation: dot-bounce 1.4s ease-in-out infinite; }
-        .es-dot:nth-child(2) { animation-delay: 0.2s; }
-        .es-dot:nth-child(3) { animation-delay: 0.4s; }
-      `}</style>
-        <div className="es-wrap">
-          <div className="es-icon-area">
-            <div className="es-pulse" />
-            <div className="es-pulse" />
-            <div className="es-pulse" />
-            <div className="es-chat-icon">
-              <MessageOutlined style={{ fontSize: 38, color: "#fff" }} />
-              <div className="es-mini-bubble es-mb1" />
-              <div className="es-mini-bubble es-mb2" />
-            </div>
-          </div>
-          <p className="es-title">ChatFlow'a hoş geldin</p>
-          <p className="es-subtitle">
-            Sohbet başlatmak için sol panelden bir kişi ya da grup seç.
-          </p>
-          <div className="es-dots">
-            <div className="es-dot" />
-            <div className="es-dot" />
-            <div className="es-dot" />
-          </div>
-        </div>
-      </div>
-    );
+    return <WelcomeScreen />;
   }
 
   const loadMoreMessages = async () => {
@@ -543,8 +543,6 @@ export default function ChatArea() {
     if (!container) return;
 
     setLoadingMore(true);
-
-    // Yükleme öncesi scroll yüksekliğini kaydet (pozisyon korumak için)
     const prevScrollHeight = container.scrollHeight;
 
     try {
@@ -555,51 +553,25 @@ export default function ChatArea() {
           skipRef.current,
         );
 
-      // Eski mesajları listenin BAŞINA ekle
       isPrependingRef.current = true;
       dispatch(setMessages([...res.messages, ...messages]));
       setHasMore(res.hasMore);
       skipRef.current += res.messages.length;
       prevMessageCountRef.current = messages.length + res.messages.length;
 
-      // Scroll pozisyonunu koru: yeni eklenen içerik kadar aşağı kaydır
       requestAnimationFrame(() => {
-        if (container) {
-          const newScrollHeight = container.scrollHeight;
-          container.scrollTop = newScrollHeight - prevScrollHeight;
-        }
+        container.scrollTop = container.scrollHeight - prevScrollHeight;
       });
     } catch {
-      // sessizce geç
+      return;
     } finally {
       setLoadingMore(false);
     }
   };
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        minWidth: 0,
-        minHeight: 0,
-        height: "100%",
-        position: "relative",
-      }}
-    >
-      {/* Sohbet kolonu */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-          minHeight: 0,
-          height: "100%",
-          background: "#fff",
-          position: "relative",
-        }}
-      >
+    <div className="chat-area">
+      <div className="chat-column">
         <ChatHeader
           isRoom={isRoom}
           activeUser={activeUser}
@@ -626,67 +598,61 @@ export default function ChatArea() {
           openMembersModal={openMembersModal}
         />
 
-        {/* Mesaj listesi */}
         <div
           ref={messagesContainerRef}
+          className="chat-messages"
           onClick={() => {
             if (searchOpen) closeSearch();
           }}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            padding: "24px",
-            background: "#fff",
-          }}
         >
           {messagesLoading ? (
-            <div
-              style={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Spin size="large" />
-            </div>
+            showSkeleton && <MessagesSkeleton />
           ) : (
             <>
-              {messages.map((msg) => (
-                <MessageBubble
-                  key={msg.id}
-                  msg={msg}
-                  currentUser={currentUser}
-                  isRoom={isRoom}
-                  activeUser={activeUser}
-                  searchQuery={searchQuery}
-                  matchingMessageIds={matchingMessageIds}
-                  activeMatchId={activeMatchId}
-                />
-              ))}
+              {loadingMore && (
+                <div className="chat-load-more">
+                  <div className="chat-skeleton-bubble chat-load-more-bar" />
+                </div>
+              )}
+              <Animate type="fade" key={activeConversationId} duration={260}>
+                {messages.map((msg) => {
+                  const bubble = (
+                    <MessageBubble
+                      msg={msg}
+                      currentUser={currentUser}
+                      isRoom={isRoom}
+                      activeUser={activeUser}
+                      searchQuery={searchQuery}
+                      matchingMessageIds={matchingMessageIds}
+                      activeMatchId={activeMatchId}
+                    />
+                  );
+
+                  return msg.id > baselineMessageId ? (
+                    <Animate key={msg.id} type="pop">
+                      {bubble}
+                    </Animate>
+                  ) : (
+                    <div key={msg.id}>{bubble}</div>
+                  );
+                })}
+              </Animate>
               <div ref={messagesEndRef} />
             </>
           )}
         </div>
 
-        {/* Yazıyor göstergesi (engel yoksa) */}
         {!isBlocked &&
           typingUsers.length > 0 &&
           (isRoom
             ? typingMemberNames.length > 0
-            : typingUsers.includes(activeConversationId!)) && (
+            : typingUsers.includes(activeConversationId)) && (
             <div className="typing-indicator">
               {!isRoom && (
                 <Avatar
                   size={26}
                   src={avatarUrl(activeUser?.avatar)}
-                  style={{
-                    background: "var(--color-primary)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}
+                  className="typing-avatar"
                 >
                   {activeUser?.fullName?.charAt(0)}
                 </Avatar>
@@ -704,49 +670,19 @@ export default function ChatArea() {
             </div>
           )}
 
-        {/* Aşağı in butonu */}
         {showScrollButton && (
-          <div
+          <button
+            type="button"
             onClick={scrollToBottom}
-            style={{
-              position: "absolute",
-              bottom: 90,
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: hasNewMessage ? "var(--color-primary)" : "#fff",
-              color: hasNewMessage ? "#fff" : "var(--color-primary)",
-              border: hasNewMessage
-                ? "none"
-                : "1px solid var(--color-primary-light)",
-              padding: "8px 16px",
-              borderRadius: 20,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 4px 12px rgba(74,85,104,0.25)",
-              fontSize: 13,
-              fontWeight: 500,
-              zIndex: 10,
-            }}
+            className={`chat-scroll-btn ${hasNewMessage ? "has-new" : ""}`}
           >
             {hasNewMessage ? "Yeni mesaj" : "Aşağı in"}
-            <span style={{ fontSize: 16, lineHeight: 1 }}>↓</span>
-          </div>
+            <span className="chat-scroll-arrow">↓</span>
+          </button>
         )}
 
-        {/* Mesaj yazma alanı — engel yoksa input, varsa uyarı */}
         {isBlocked ? (
-          <div
-            style={{
-              padding: "18px 24px",
-              borderTop: "1px solid #f0f0f0",
-              background: "#fafafa",
-              textAlign: "center",
-              color: "#999",
-              fontSize: 14,
-            }}
-          >
+          <div className="chat-blocked-bar anim anim-fade-up">
             {iBlocked
               ? "Bu kullanıcıyı engellediniz. Mesajlaşmak için engeli kaldırın."
               : "Bu kullanıcıyla mesajlaşamazsınız."}
@@ -776,7 +712,6 @@ export default function ChatArea() {
         />
       </div>
 
-      {/* Kişi detay paneli (bireysel sohbet) */}
       {detailOpen && !isRoom && activeUser && (
         <UserDetailPanel
           user={activeUser}
@@ -785,7 +720,6 @@ export default function ChatArea() {
         />
       )}
 
-      {/* Grup detay paneli */}
       {detailOpen && isRoom && activeRoom && (
         <GroupDetailPanel
           room={activeRoom}

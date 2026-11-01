@@ -1,172 +1,185 @@
 .chats-panel {
-    width: 380px;
-    padding: 10px;
-    background: #f1f5f2;
-    border-right: 1px solid #e3ebe5;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
+  width: 380px;
+  padding: 10px;
+  background: #f1f5f2;
+  border-right: 1px solid #e3ebe5;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
 }
 
 .chats-panel-header {
-    padding: 20px;
-    font-size: 24px;
-    font-weight: 700;
-    color: #333;
+  padding: 20px 20px 16px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
 }
 
 .chats-panel-search {
-    padding: 0 14px 16px;
+  padding: 0 14px 8px;
 }
 
 .chats-panel-search .ant-input-affix-wrapper {
-    border-radius: 8px !important;
-    background: #e3ebe5 !important;
-    border: none !important;
-    height: 38px;
-    font-size: 13px;
+  border-radius: 10px !important;
+  background: #e3ebe5 !important;
+  border: none !important;
+  height: 40px;
+  font-size: 14px;
+}
+
+.chats-search-icon {
+  color: #b0aec8;
+}
+
+.chats-section-title {
+  padding: 14px 20px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a948d;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .chats-panel-online {
-    padding: 20px 14px 16px;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  padding: 22px 14px 10px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .chats-panel-online::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 .online-user-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    background: #d3ddd5;
-    border-radius: 10px;
-    padding: 0 10px 10px;
-    min-width: 72px;
-    max-width: 72px;
-    position: relative;
-    transition: background 0.3s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 72px;
+  padding: 0 8px 10px;
+  border: none;
+  border-radius: 12px;
+  background: #dfe8e2;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.2s, transform 0.2s;
 }
 
 .online-user-card:hover {
-    background: #dee7e1;
+  background: #d3ddd5;
+  transform: translateY(-2px);
 }
 
 .online-user-avatar-wrapper {
-    position: relative;
-    margin-top: -18px;
+  position: relative;
+  margin-top: -18px;
+}
+
+.online-user-avatar {
+  background: var(--color-primary) !important;
+  font-size: 16px !important;
+  font-weight: 600;
+  border: 2px solid #f1f5f2 !important;
 }
 
 .online-user-dot {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #52c41a;
-    border: 2px solid #fff;
-}
-
-.chats-panel-recent-title {
-    padding: 20px 10px;
-    font-size: 15px;
-    font-weight: 600;
-    color: #000000;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.chats-panel-list {
-    flex: 1;
-    overflow-y: auto;
-}
-
-.chats-panel-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 20px;
-    cursor: pointer;
-    gap: 12px;
-    border-left: 3px solid transparent;
-    transition: background 0.2s;
-}
-
-.chats-panel-item:hover {
-    background: #e3ebe5;
-}
-
-.chats-panel-item.active {
-    background: #e3ebe5;
-    border-left: 3px solid var(--color-primary);
-}
-
-.chats-panel-item-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.chats-panel-item-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.chats-panel-item-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 2px;
-}
-
-.chats-panel-item-last-msg {
-    font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 160px;
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #52c41a;
+  border: 2px solid #fff;
 }
 
 .online-user-name {
-    font-size: 12px;
-    color: #555;
-    font-weight: 500;
-    margin-top: 6px;
-    max-width: 60px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  font-size: 12px !important;
+  color: #555 !important;
+  font-weight: 500;
+  margin-top: 6px;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chats-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px 12px;
+}
+
+.chats-panel-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 2px 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chats-panel-item:hover,
+.chats-panel-item.long-pressed {
+  background: #e3ebe5;
+}
+
+.chats-panel-item.active {
+  background: #dbe6de;
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.chats-avatar {
+  background: var(--color-primary) !important;
+  font-size: 16px !important;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.chats-panel-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .chats-panel-item-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 200px;
+  font-size: 14px !important;
+  font-weight: 600;
+  color: #333 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Okunmamış mesaj işareti (WhatsApp tarzı yeşil nokta) */
-.chats-unread-dot {
-  width: 12px;
-  height: 12px;
-  background: #52c41a;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-left: 6px;
+.chats-panel-item.is-unread .chats-panel-item-name {
+  font-weight: 700;
+  color: #111 !important;
 }
 
+.chats-panel-item-status {
+  font-size: 12px !important;
+  color: #9aa29c !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* Okunmamış mesaj sayı rozeti (WhatsApp tarzı) */
+.chats-panel-item-status.is-highlight {
+  color: var(--color-primary) !important;
+}
+
+.chats-panel-item.is-unread .chats-panel-item-status {
+  font-weight: 600;
+}
+
 .chats-unread-badge {
   min-width: 20px;
   height: 20px;
@@ -180,34 +193,72 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-left: 6px;
 }
- 
 
-/* Masaüstü: sohbet satırında 3 nokta (hover'da görünür) */
 .chats-item-more {
+  display: flex;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.15s;
-  flex-shrink: 0;
 }
 
 .chats-panel-item:hover .chats-item-more {
   opacity: 1;
 }
 
-/* Long-press seçili satır */
-.chats-panel-item.long-pressed {
-  background: #e3ebe5;
+.chats-item-more-icon {
+  font-size: 16px;
+  color: #aaa;
+  padding: 4px;
+  cursor: pointer;
 }
 
-/* Mobil long-press menüsü */
+.chats-panel-empty {
+  display: block;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #9aa29c !important;
+}
+
+.chats-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px 16px;
+}
+
+.chats-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chats-skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chats-skeleton-short {
+  width: 45% !important;
+  min-width: 0 !important;
+}
+
+.chats-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
 .chats-longpress-menu {
   position: absolute;
   bottom: calc(100% + 4px);
   right: 8px;
   background: #fff;
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   padding: 6px;
   z-index: 1001;
   min-width: 160px;
@@ -233,7 +284,6 @@
 }
 
 @media (max-width: 900px) {
-  /* Mobilde 3 nokta gizli (long-press kullanılıyor) */
   .chats-item-more {
     display: none !important;
   }

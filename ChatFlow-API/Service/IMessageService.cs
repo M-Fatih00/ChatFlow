@@ -1,7 +1,9 @@
 using ChatFlow.API.Models.DTOs;
- 
+
 namespace ChatFlow.API.Services;
- 
+
+public sealed record MessagePage(List<MessageDTO> Messages, bool HasMore);
+
 public interface IMessageService
 {
     Task<MessageDTO> SaveMessageAsync(
@@ -11,12 +13,12 @@ public interface IMessageService
         int? roomId,
         string? attachmentUrl,
         string? attachmentType);
- 
-    Task<(List<MessageDTO> Messages, bool HasMore)> GetMessagesAsync(
-        string senderId,
-        string? recipientId,
-        int? roomId,
-        int skip = 0,
-        int take = 10);
+
+    Task<MessagePage?> GetMessagesAsync(string userId, string? recipientId, int? roomId, int skip, int take);
+
+    Task<List<MessageDTO>?> SearchAsync(string userId, string term, string? recipientId, int? roomId);
+
+    Task<List<ConversationDTO>> GetConversationsAsync(string userId);
+
+    Task<List<string>?> SoftDeleteAsync(int messageId, string userId);
 }
- 

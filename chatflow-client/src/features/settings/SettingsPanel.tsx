@@ -1,33 +1,42 @@
 import {
   Avatar,
+  Button,
   Collapse,
+  Input,
+  Modal,
+  Skeleton,
+  Spin,
   Typography,
   message,
-  Modal,
-  Input,
-  Button,
 } from "antd";
 import {
   EditOutlined,
+  LogoutOutlined,
   SafetyOutlined,
   SearchOutlined,
   StopOutlined,
   UserOutlined,
-  LogoutOutlined,
 } from "@ant-design/icons";
-import { useAppSelector, useAppDispatch } from "../../store/store";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
+import { useAppDispatch, useAppSelector } from "../../store/store";
 import {
+  logoutUser,
   updateAvatar,
   updateProfile,
-  logoutUser,
 } from "../../features/auth/authSlice";
 import agent from "../../api/requests";
-import { useRef, useState, useEffect } from "react";
 import { avatarUrl } from "../../utils/avatarUrl";
+import { getApiError } from "../../utils/apiError";
 import "./SettingsPanel.css";
 
 const { Text } = Typography;
 const { TextArea } = Input;
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,30}$/;
 
 interface BlockedUser {
   id: string;
@@ -41,36 +50,42 @@ export default function SettingsPanel() {
   const { user } = useAppSelector((state) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Profil düzenleme modalı
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
   const [editOpen, setEditOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Şifre değiştirme
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Engellenen kullanıcılar (modal)
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [blockedLoading, setBlockedLoading] = useState(true);
   const [blockedOpen, setBlockedOpen] = useState(false);
   const [blockedSearch, setBlockedSearch] = useState("");
 
-  const loadBlocked = () => {
+  const emailChanged =
+    email.trim().length > 0 &&
+    email.trim().toLowerCase() !== (user?.email ?? "").toLowerCase();
+
+  const loadBlocked = useCallback(() => {
     agent.Block.getBlockedUsers()
       .then(setBlockedUsers)
-      .catch(() => {});
-  };
+      .catch(() => undefined)
+      .finally(() => setBlockedLoading(false));
+  }, []);
 
   useEffect(() => {
     loadBlocked();
     window.addEventListener("blockStatusChanged", loadBlocked);
     return () => window.removeEventListener("blockStatusChanged", loadBlocked);
-  }, []);
+  }, [loadBlocked]);
 
   const handleUnblock = async (userId: string) => {
     try {
@@ -80,37 +95,45 @@ export default function SettingsPanel() {
       window.dispatchEvent(
         new CustomEvent("blockStatusChanged", { detail: { userId } }),
       );
-    } catch {
-      message.error("İşlem başarısız");
+    } catch (error) {
+      message.error(getApiError(error, "İşlem başarısız"));
     }
   };
 
+  const searchTerm = blockedSearch.trim().toLowerCase();
   const filteredBlocked = blockedUsers.filter(
     (u) =>
-      u.fullName.toLowerCase().includes(blockedSearch.toLowerCase()) ||
-      u.userName.toLowerCase().includes(blockedSearch.toLowerCase()),
+      u.fullName.toLowerCase().includes(searchTerm) ||
+      u.userName.toLowerCase().includes(searchTerm),
   );
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
+
+    if (!AVATAR_TYPES.includes(file.type)) {
+      message.warning("Sadece jpg, png ve webp dosyaları yükleyebilirsiniz");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      message.warning("Fotoğraf en fazla 2MB olabilir");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
 
+    setUploadingAvatar(true);
     try {
       const res = await agent.User.updateAvatar(formData);
       dispatch(updateAvatar(res.avatar));
       message.success("Profil fotoğrafı güncellendi");
-    } catch {
-      message.error("Fotoğraf yüklenemedi");
+    } catch (error) {
+      message.error(getApiError(error, "Fotoğraf yüklenemedi"));
+    } finally {
+      setUploadingAvatar(false);
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const openEditModal = () => {
@@ -118,31 +141,42 @@ export default function SettingsPanel() {
     setUserName(user?.userName ?? "");
     setEmail(user?.email ?? "");
     setBio(user?.bio ?? "");
+    setEmailPassword("");
     setEditOpen(true);
   };
 
   const handleSave = async () => {
-    if (!fullName.trim()) {
-      message.warning("İsim boş olamaz");
+    const trimmedName = fullName.trim();
+    const trimmedUserName = userName.trim();
+    const trimmedEmail = email.trim();
+
+    if (trimmedName.length < 2) {
+      message.warning("İsim en az 2 karakter olmalı");
       return;
     }
-    if (!userName.trim()) {
-      message.warning("Kullanıcı adı boş olamaz");
+    if (!USERNAME_PATTERN.test(trimmedUserName)) {
+      message.warning(
+        "Kullanıcı adı 3-30 karakter olmalı; harf, rakam, nokta, alt çizgi ve tire içerebilir",
+      );
       return;
     }
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) {
       message.warning("Geçerli bir e-posta adresi girin");
+      return;
+    }
+    if (emailChanged && !emailPassword) {
+      message.warning("E-posta değiştirmek için mevcut şifrenizi girin");
       return;
     }
 
     setSaving(true);
     try {
       const res = await agent.User.updateProfile({
-        fullName: fullName.trim(),
-        userName: userName.trim(),
-        email: email.trim(),
-        avatar: user?.avatar,
-        bio: bio.trim(),
+        fullName: trimmedName,
+        userName: trimmedUserName,
+        email: trimmedEmail || undefined,
+        bio: bio.trim() || undefined,
+        currentPassword: emailChanged ? emailPassword : undefined,
       });
       dispatch(
         updateProfile({
@@ -154,9 +188,8 @@ export default function SettingsPanel() {
       );
       message.success("Profil güncellendi");
       setEditOpen(false);
-    } catch (error: any) {
-      const msg = error?.response?.data?.message ?? "Profil güncellenemedi";
-      message.error(msg);
+    } catch (error) {
+      message.error(getApiError(error, "Profil güncellenemedi"));
     } finally {
       setSaving(false);
     }
@@ -167,8 +200,12 @@ export default function SettingsPanel() {
       message.warning("Tüm alanları doldurun");
       return;
     }
-    if (newPassword.length < 6) {
-      message.warning("Yeni şifre en az 6 karakter olmalı");
+    if (newPassword.length < 8) {
+      message.warning("Yeni şifre en az 8 karakter olmalı");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      message.warning("Yeni şifre küçük harf ve rakam içermeli");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -178,13 +215,18 @@ export default function SettingsPanel() {
 
     setChangingPassword(true);
     try {
-      await agent.Auth.changePassword({ currentPassword, newPassword });
-      message.success("Şifre başarıyla değiştirildi");
+      const res = await agent.Auth.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      message.success(res?.message ?? "Şifre değiştirildi");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch {
-      message.error("Mevcut şifre hatalı veya yeni şifre geçersiz");
+    } catch (error) {
+      message.error(
+        getApiError(error, "Mevcut şifre hatalı veya yeni şifre geçersiz"),
+      );
     } finally {
       setChangingPassword(false);
     }
@@ -201,101 +243,116 @@ export default function SettingsPanel() {
     });
   };
 
+  const confirmLogoutAll = () => {
+    Modal.confirm({
+      title: "Tüm cihazlardan çıkış",
+      content:
+        "Bu cihaz dahil, hesabınızın açık olduğu tüm cihazlarda oturum kapanacak.",
+      okText: "Tümünden Çık",
+      okType: "danger",
+      cancelText: "İptal",
+      onOk: async () => {
+        try {
+          await agent.Auth.logoutAll();
+        } finally {
+          dispatch(logoutUser());
+        }
+      },
+    });
+  };
+
   return (
     <div className="settings-panel">
-      {/* Header */}
       <div className="settings-panel-header">
-        <Text className="settings-panel-title">Settings</Text>
+        <Text className="settings-panel-title">Ayarlar</Text>
       </div>
 
-      {/* Avatar */}
-      <div className="settings-panel-avatar-section">
+      <div className="settings-panel-avatar-section anim anim-fade-up">
         <div className="settings-panel-avatar-wrapper">
-          <Avatar
-            size={80}
-            src={avatarUrl(user?.avatar)}
-            style={{
-              background: "var(--color-primary)",
-              fontSize: 28,
-              fontWeight: 600,
-            }}
-          >
-            {user?.fullName?.charAt(0).toUpperCase() ?? "U"}
-          </Avatar>
-          <div
+          <Spin spinning={uploadingAvatar}>
+            <Avatar
+              size={80}
+              src={avatarUrl(user?.avatar)}
+              className="settings-panel-avatar"
+            >
+              {user?.fullName?.charAt(0).toUpperCase() ?? "U"}
+            </Avatar>
+          </Spin>
+          <button
+            type="button"
             className="settings-panel-edit-btn"
-            onClick={handleAvatarClick}
-            style={{ cursor: "pointer" }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingAvatar}
+            aria-label="Profil fotoğrafını değiştir"
           >
-            <EditOutlined style={{ fontSize: 12, color: "#fff" }} />
-          </div>
+            <EditOutlined />
+          </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
-            style={{ display: "none" }}
+            accept={AVATAR_TYPES.join(",")}
+            hidden
             onChange={handleAvatarChange}
           />
         </div>
         <Text className="settings-panel-name">{user?.fullName ?? "-"}</Text>
+        <Text className="settings-panel-username">@{user?.userName}</Text>
       </div>
 
       <div className="settings-panel-divider" />
 
-      {/* Collapse */}
       <Collapse
         accordion
-        ghost={false}
         defaultActiveKey={["personal"]}
-        className="settings-panel-collapse"
+        className="settings-panel-collapse anim anim-fade-up"
+        style={{ animationDelay: "80ms" }}
         items={[
           {
             key: "personal",
             label: (
               <Text strong>
-                <UserOutlined
-                  style={{ color: "var(--color-primary)", marginRight: 8 }}
-                />
-                Personal Info
+                <UserOutlined className="settings-section-icon" />
+                Kişisel Bilgiler
               </Text>
             ),
             children: (
               <div className="settings-collapse-box">
                 <div className="settings-info-row">
                   <div>
-                    <Text className="settings-info-label">Name</Text>
+                    <Text className="settings-info-label">Ad soyad</Text>
                     <Text className="settings-info-value">
-                      {user?.fullName ?? "-"}
+                      {user?.fullName || "-"}
                     </Text>
                   </div>
-                  <button className="settings-edit-btn" onClick={openEditModal}>
-                    <EditOutlined style={{ fontSize: 12 }} /> Edit
+                  <button
+                    type="button"
+                    className="settings-edit-btn"
+                    onClick={openEditModal}
+                  >
+                    <EditOutlined /> Düzenle
                   </button>
                 </div>
                 <div className="settings-info-row">
                   <div>
-                    <Text className="settings-info-label">Username</Text>
+                    <Text className="settings-info-label">Kullanıcı adı</Text>
                     <Text className="settings-info-value">
-                      @{user?.userName ?? "-"}
+                      @{user?.userName || "-"}
                     </Text>
                   </div>
                 </div>
                 <div className="settings-info-row">
                   <div>
-                    <Text className="settings-info-label">Bio</Text>
+                    <Text className="settings-info-label">Hakkında</Text>
                     <Text className="settings-info-value">
-                      {user?.bio ?? "-"}
+                      {user?.bio || "-"}
                     </Text>
                   </div>
                 </div>
-                <div
-                  className="settings-info-row"
-                  style={{ borderBottom: "none" }}
-                >
+                <div className="settings-info-row settings-info-row-last">
                   <div>
-                    <Text className="settings-info-label">Email</Text>
+                    <Text className="settings-info-label">E-posta</Text>
                     <Text className="settings-info-value">
-                      {user?.email ?? "-"}
+                      {user?.email || "-"}
                     </Text>
                   </div>
                 </div>
@@ -306,77 +363,71 @@ export default function SettingsPanel() {
             key: "security",
             label: (
               <Text strong>
-                <SafetyOutlined
-                  style={{ color: "var(--color-primary)", marginRight: 8 }}
-                />
-                Security
+                <SafetyOutlined className="settings-section-icon" />
+                Güvenlik
               </Text>
             ),
             children: (
-              <div className="settings-collapse-box">
-                <div style={{ padding: "4px 0" }}>
-                  <Text
-                    strong
-                    style={{ display: "block", marginBottom: 12, fontSize: 14 }}
-                  >
-                    Şifre Değiştir
-                  </Text>
+              <div className="settings-collapse-box settings-security">
+                <Text strong className="settings-subtitle">
+                  Şifre Değiştir
+                </Text>
 
-                  <div style={{ marginBottom: 12 }}>
-                    <Text
-                      className="settings-info-label"
-                      style={{ display: "block", marginBottom: 4 }}
-                    >
-                      Mevcut Şifre
-                    </Text>
-                    <Input.Password
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="Mevcut şifreniz"
-                    />
-                  </div>
+                <label className="settings-field">
+                  <Text className="settings-info-label">Mevcut şifre</Text>
+                  <Input.Password
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Mevcut şifreniz"
+                    autoComplete="current-password"
+                    maxLength={128}
+                  />
+                </label>
 
-                  <div style={{ marginBottom: 12 }}>
-                    <Text
-                      className="settings-info-label"
-                      style={{ display: "block", marginBottom: 4 }}
-                    >
-                      Yeni Şifre
-                    </Text>
-                    <Input.Password
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Yeni şifre (en az 6 karakter)"
-                    />
-                  </div>
+                <label className="settings-field">
+                  <Text className="settings-info-label">Yeni şifre</Text>
+                  <Input.Password
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="En az 8 karakter, harf ve rakam"
+                    autoComplete="new-password"
+                    maxLength={128}
+                  />
+                </label>
 
-                  <div style={{ marginBottom: 16 }}>
-                    <Text
-                      className="settings-info-label"
-                      style={{ display: "block", marginBottom: 4 }}
-                    >
-                      Yeni Şifre (Tekrar)
-                    </Text>
-                    <Input.Password
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Yeni şifreyi tekrar girin"
-                    />
-                  </div>
+                <label className="settings-field">
+                  <Text className="settings-info-label">Yeni şifre (tekrar)</Text>
+                  <Input.Password
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Yeni şifreyi tekrar girin"
+                    autoComplete="new-password"
+                    maxLength={128}
+                  />
+                </label>
 
-                  <Button
-                    type="primary"
-                    block
-                    loading={changingPassword}
-                    onClick={handleChangePassword}
-                    style={{
-                      background: "var(--color-primary)",
-                      borderColor: "var(--color-primary)",
-                    }}
-                  >
-                    Şifreyi Değiştir
-                  </Button>
-                </div>
+                <Button
+                  type="primary"
+                  block
+                  loading={changingPassword}
+                  onClick={handleChangePassword}
+                  className="settings-primary-btn"
+                >
+                  Şifreyi Değiştir
+                </Button>
+
+                <div className="settings-security-divider" />
+
+                <Text strong className="settings-subtitle">
+                  Oturumlar
+                </Text>
+                <Text type="secondary" className="settings-help">
+                  Hesabınız başka bir cihazda açık kaldıysa tüm oturumları
+                  kapatabilirsiniz.
+                </Text>
+                <Button danger block onClick={confirmLogoutAll}>
+                  Tüm cihazlardan çıkış yap
+                </Button>
               </div>
             ),
           },
@@ -384,20 +435,20 @@ export default function SettingsPanel() {
             key: "blocked",
             label: (
               <Text strong>
-                <StopOutlined style={{ color: "#ff4d4f", marginRight: 8 }} />
-                Blocked Users
+                <StopOutlined className="settings-section-icon settings-section-icon-danger" />
+                Engellenen Kullanıcılar
               </Text>
             ),
             children: (
               <div className="settings-collapse-box">
-                <div
-                  className="settings-info-row"
-                  style={{ borderBottom: "none" }}
-                >
-                  <Text className="settings-info-value">
-                    {blockedUsers.length} blocked{" "}
-                    {blockedUsers.length === 1 ? "user" : "users"}
-                  </Text>
+                <div className="settings-info-row settings-info-row-last">
+                  {blockedLoading ? (
+                    <Skeleton.Input active size="small" />
+                  ) : (
+                    <Text className="settings-info-value">
+                      {blockedUsers.length} engellenen kullanıcı
+                    </Text>
+                  )}
                   <Button
                     size="small"
                     onClick={() => {
@@ -405,7 +456,7 @@ export default function SettingsPanel() {
                       setBlockedOpen(true);
                     }}
                   >
-                    Manage
+                    Yönet
                   </Button>
                 </div>
               </div>
@@ -414,66 +465,47 @@ export default function SettingsPanel() {
         ]}
       />
 
-      {/* Engellenenler modalı */}
       <Modal
-        title="Blocked Users"
+        title="Engellenen Kullanıcılar"
         open={blockedOpen}
         onCancel={() => setBlockedOpen(false)}
         footer={null}
       >
         <Input
-          prefix={<SearchOutlined style={{ color: "#b0aec8" }} />}
-          placeholder="Search by name or username"
+          prefix={<SearchOutlined className="settings-search-icon" />}
+          placeholder="İsim veya kullanıcı adıyla ara"
           value={blockedSearch}
           onChange={(e) => setBlockedSearch(e.target.value)}
-          style={{ marginBottom: 12 }}
+          allowClear
+          className="settings-blocked-search"
         />
-        <div style={{ maxHeight: 360, overflowY: "auto" }}>
+        <div className="settings-blocked-list">
           {filteredBlocked.length === 0 ? (
-            <Text style={{ color: "#aaa", fontSize: 13 }}>
+            <Text type="secondary">
               {blockedUsers.length === 0
-                ? "No blocked users."
-                : "No results found."}
+                ? "Engellediğiniz kullanıcı yok."
+                : "Sonuç bulunamadı."}
             </Text>
           ) : (
             filteredBlocked.map((u) => (
-              <div
-                key={u.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 0",
-                  borderBottom: "1px solid #f0f0f0",
-                }}
-              >
+              <div key={u.id} className="settings-blocked-item">
                 <Avatar
                   size={40}
                   src={avatarUrl(u.avatar)}
-                  style={{
-                    background: "var(--color-primary)",
-                    fontSize: 15,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                  }}
+                  className="settings-blocked-avatar"
                 >
                   {u.fullName.charAt(0).toUpperCase()}
                 </Avatar>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Text strong style={{ display: "block" }}>
+                <div className="settings-blocked-info">
+                  <Text strong ellipsis>
                     {u.fullName}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#aaa" }}>
+                  <Text type="secondary" className="settings-blocked-username">
                     @{u.userName}
                   </Text>
                 </div>
-                <Button
-                  size="small"
-                  danger
-                  icon={<StopOutlined />}
-                  onClick={() => handleUnblock(u.id)}
-                >
-                  Unblock
+                <Button size="small" onClick={() => handleUnblock(u.id)}>
+                  Engeli kaldır
                 </Button>
               </div>
             ))
@@ -481,7 +513,6 @@ export default function SettingsPanel() {
         </div>
       </Modal>
 
-      {/* Profil düzenleme modalı */}
       <Modal
         title="Profili Düzenle"
         open={editOpen}
@@ -495,44 +526,59 @@ export default function SettingsPanel() {
             type="primary"
             loading={saving}
             onClick={handleSave}
-            style={{
-              background: "var(--color-primary)",
-              borderColor: "var(--color-primary)",
-            }}
+            className="settings-primary-btn"
           >
             Kaydet
           </Button>,
         ]}
       >
-        <div style={{ marginBottom: 16 }}>
-          <Text strong>İsim</Text>
+        <label className="settings-modal-field">
+          <Text strong>Ad soyad</Text>
           <Input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="İsminiz"
-            style={{ marginTop: 6 }}
+            placeholder="Adınız Soyadınız"
+            autoComplete="name"
+            maxLength={60}
           />
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <Text strong>Kullanıcı Adı</Text>
+        </label>
+        <label className="settings-modal-field">
+          <Text strong>Kullanıcı adı</Text>
           <Input
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
             placeholder="kullaniciadi"
-            style={{ marginTop: 6 }}
+            autoComplete="username"
+            maxLength={30}
           />
-        </div>
-        <div style={{ marginBottom: 16 }}>
+        </label>
+        <label className="settings-modal-field">
           <Text strong>E-posta</Text>
           <Input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="ornek@email.com"
-            style={{ marginTop: 6 }}
+            placeholder="ornek@mail.com"
+            autoComplete="email"
+            maxLength={254}
           />
-        </div>
-        <div>
+        </label>
+        {emailChanged && (
+          <label className="settings-modal-field">
+            <Text strong>Mevcut şifre</Text>
+            <Text type="secondary" className="settings-help">
+              E-posta adresinizi değiştirmek için şifrenizi doğrulayın.
+            </Text>
+            <Input.Password
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.target.value)}
+              placeholder="Mevcut şifreniz"
+              autoComplete="current-password"
+              maxLength={128}
+            />
+          </label>
+        )}
+        <label className="settings-modal-field">
           <Text strong>Hakkında</Text>
           <TextArea
             value={bio}
@@ -541,12 +587,10 @@ export default function SettingsPanel() {
             maxLength={140}
             showCount
             autoSize={{ minRows: 2, maxRows: 4 }}
-            style={{ marginTop: 6 }}
           />
-        </div>
+        </label>
       </Modal>
 
-      {/* Çıkış (özellikle mobilde) */}
       <div className="settings-logout-section">
         <Button
           danger

@@ -1,37 +1,28 @@
-# ==== 1) Frontend build (React/Vite) ====
-FROM node:20 AS frontend
+FROM node:22-alpine AS frontend
 WORKDIR /client
 
-# Bağımlılıkları önce kopyala (katman önbelleği)
-COPY chatflow-client/package*.json ./
-RUN npm install
+COPY chatflow-client/package.json chatflow-client/package-lock.json ./
+RUN npm ci
 
-# Kaynak kodu kopyala ve build et
 COPY chatflow-client/ ./
-# Aynı domain: API göreli yoldan çağrılacak
 ENV VITE_API_BASE_URL=/api/
 RUN npm run build
-# Vite çıktısı: /client/dist
 
-# ==== 2) Backend build (.NET) ====
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
 
 COPY ChatFlow-API/ChatFlow.API.csproj ./
 RUN dotnet restore ChatFlow.API.csproj
 
 COPY ChatFlow-API/ ./
-RUN dotnet publish ChatFlow.API.csproj -c Release -o /app/publish
+RUN dotnet publish ChatFlow.API.csproj -c Release -o /app/publish --no-restore
 
-# ==== 3) Runtime ====
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Backend publish çıktısı
 COPY --from=backend /app/publish ./
-
-# Frontend build çıktısını wwwroot'a koy (backend buradan sunacak)
 COPY --from=frontend /client/dist ./wwwroot
 
-# Render PORT verir; ona bağlan
-ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet ChatFlow.API.dll"]
+USER $APP_UID
+
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet ChatFlow.API.dll"]

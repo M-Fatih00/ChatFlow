@@ -6,16 +6,21 @@ import { router } from "../router/Routes";
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.withCredentials = true;
 
-// Interceptor
+const SILENT_401_URLS = ["auth/me", "auth/login"];
+
 axios.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if (!error.response) {
+      toast.error("Sunucuya ulaşılamıyor. Bağlantınızı kontrol edin.");
+      return Promise.reject(error);
+    }
+
     const { data, status } = error.response as AxiosResponse;
 
     switch (status) {
       case 400:
-        if (data.errors) {
-          // Validation hatası — form'larda catch ile yakalanır
+        if (data?.errors) {
           const modelStateErrors: string[] = [];
           for (const key in data.errors) {
             if (data.errors[key]) {
@@ -26,14 +31,14 @@ axios.interceptors.response.use(
         }
         break;
 
-      case 401:
-        if (error.config?.url?.includes("account/getUser")) break;
-        if (error.config?.url?.includes("account/login")) break;
+      case 401: {
+        const url = error.config?.url ?? "";
+        if (SILENT_401_URLS.some((silentUrl) => url.includes(silentUrl))) break;
 
-        // store.dispatch(logoutUser());
         toast.error("Oturumunuz sona erdi.");
         router.navigate("/login");
         break;
+      }
 
       case 403:
         toast.error("Bu işlem için yetkiniz yok.");
@@ -41,6 +46,10 @@ axios.interceptors.response.use(
 
       case 404:
         router.navigate("/not-found");
+        break;
+
+      case 429:
+        toast.error("Çok fazla istek gönderildi. Lütfen biraz bekleyin.");
         break;
 
       case 500:
@@ -59,10 +68,10 @@ axios.interceptors.response.use(
 const requests = {
   get: (url: string) => axios.get(url).then((res: AxiosResponse) => res.data),
 
-  post: (url: string, body: any) =>
+  post: (url: string, body: unknown) =>
     axios.post(url, body).then((res: AxiosResponse) => res.data),
 
-  put: (url: string, body: any) =>
+  put: (url: string, body: unknown) =>
     axios.put(url, body).then((res: AxiosResponse) => res.data),
 
   delete: (url: string) =>
@@ -70,9 +79,10 @@ const requests = {
 };
 
 const Auth = {
-  login: (values: {}) => requests.post("auth/login", values),
-  register: (values: {}) => requests.post("auth/register", values),
+  login: (values: object) => requests.post("auth/login", values),
+  register: (values: object) => requests.post("auth/register", values),
   logout: () => requests.post("auth/logout", {}),
+  logoutAll: () => requests.post("auth/logout-all", {}),
   getMe: () => requests.get("auth/me"),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     requests.post("auth/change-password", data),
@@ -115,14 +125,17 @@ const Room = {
 };
 
 const User = {
-  getUsers: () => requests.get("user"),
-  getUser: (username: string) => requests.get(`user/${username}`),
+  search: (q: string) => requests.get(`user?q=${encodeURIComponent(q)}`),
+  getById: (id: string) =>
+    requests.get(`user/by-id/${encodeURIComponent(id)}`),
+  getUser: (username: string) =>
+    requests.get(`user/${encodeURIComponent(username)}`),
   updateProfile: (data: {
     fullName: string;
     userName: string;
-    avatar?: string;
     email?: string;
     bio?: string;
+    currentPassword?: string;
   }) => requests.put("user/profile", data),
   updateAvatar: (data: FormData) => requests.put("user/avatar", data),
 };
@@ -148,14 +161,6 @@ const Friendship = {
   getSent: () => requests.get("friendship/sent"),
 };
 
-// const Errors = {
-//     get400Error: () => requests.get("error/bad-request"),
-//     get401Error: () => requests.get("error/unauthorized"),
-//     get404Error: () => requests.get("error/not-found"),
-//     get500Error: () => requests.get("error/server-error"),
-//     getValidationError: () => requests.get("error/validation-error"),
-// };
-
 export default {
   Auth,
   Message,
@@ -163,5 +168,4 @@ export default {
   User,
   Block,
   Friendship,
-  // Errors,
 };

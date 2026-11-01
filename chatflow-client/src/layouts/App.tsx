@@ -1,36 +1,53 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { message, Modal } from "antd";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import { getMe, logoutUser } from "../features/auth/authSlice";
-import { signalRService } from "../api/signalRService";
-import { message, Modal } from "antd";
-import "../index.css";
 import { clearActiveConversation } from "../features/chats/chatSlice";
+import { signalRService } from "../api/signalRService";
+import "../index.css";
+import "../components/Animate/Animate.css";
+
+const PUBLIC_PATHS = ["/login", "/register"];
 
 function App() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { isAuthenticated, status, token } = useAppSelector(
-    (state) => state.auth,
-  );
+  const { isAuthenticated, status } = useAppSelector((state) => state.auth);
+  const isPublicPath = PUBLIC_PATHS.includes(location.pathname);
 
   useEffect(() => {
     dispatch(getMe());
-  }, []); // sadece bir kez çalışsın
+  }, [dispatch]);
 
   useEffect(() => {
-    if (status === "ready" && !isAuthenticated) {
-      navigate("/login");
+    if (status !== "ready") return;
+
+    if (!isAuthenticated && !isPublicPath) {
+      navigate("/login", { replace: true });
+      return;
     }
 
-    if (status === "ready" && isAuthenticated && token) {
-      signalRService.connect(token);
-      // Mobilde giriş sonrası layout'u yeniden hesaplat (sidebar hemen görünsün)
-      setTimeout(() => window.dispatchEvent(new Event("resize")), 100);
+    if (isAuthenticated && isPublicPath) {
+      navigate("/", { replace: true });
     }
-  }, [status, isAuthenticated, token]);
+  }, [status, isAuthenticated, isPublicPath, navigate]);
+
+  useEffect(() => {
+    if (status !== "ready" || !isAuthenticated) return;
+
+    signalRService.connect().catch(() => {
+      message.error("Anlık bağlantı kurulamadı. Sayfayı yenilemeyi deneyin.");
+    });
+
+    const timer = setTimeout(
+      () => window.dispatchEvent(new Event("resize")),
+      100,
+    );
+    return () => clearTimeout(timer);
+  }, [status, isAuthenticated]);
 
   useEffect(() => {
     const handleRemovedFromRoom = () => {
@@ -44,9 +61,6 @@ function App() {
       window.removeEventListener("removedFromRoom", handleRemovedFromRoom);
   }, [navigate, dispatch]);
 
-  // Geri tuşu: SADECE ana sayfada (/) çıkış onayı sor.
-  // Sohbet sayfasında (/chat, /room) dinleyici kurulmaz → geri doğal çalışır,
-  // react-router listeye döndürür, çıkış SORULMAZ.
   useEffect(() => {
     if (!(status === "ready" && isAuthenticated)) return;
 
@@ -54,13 +68,11 @@ function App() {
     const isOnHome = path === "/" || path === "";
     if (!isOnHome) return;
 
-    // Geri tuşunu yakalamak için buffer ekle
     window.history.pushState(null, "", window.location.href);
 
     let confirmOpen = false;
 
     const handlePopState = () => {
-      // Modal zaten açıksa, buffer'ı yenile ve çık (çift modal olmasın)
       if (confirmOpen) {
         window.history.pushState(null, "", window.location.href);
         return;
@@ -80,7 +92,6 @@ function App() {
         },
         onCancel: () => {
           confirmOpen = false;
-          // Kullanıcı kaldı → yeni buffer ekle ki bir sonraki geri tuşu da yakalansın
           window.history.pushState(null, "", window.location.href);
         },
       });
@@ -94,13 +105,13 @@ function App() {
     return (
       <div
         style={{
-          height: "100vh",
+          height: "100dvh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           gap: 16,
-          background: "#f5f5f5",
+          background: "var(--color-auth-bg, #f5f5f5)",
         }}
       >
         <div className="app-spinner" />
@@ -110,7 +121,7 @@ function App() {
   }
 
   return (
-    <div>
+    <div key={isPublicPath ? location.pathname : "app"} className="anim anim-fade">
       <Outlet />
     </div>
   );

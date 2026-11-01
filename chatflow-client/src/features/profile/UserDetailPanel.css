@@ -11,8 +11,14 @@
 }
 
 @keyframes detail-slide-in {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .user-detail-header {
@@ -29,7 +35,23 @@
   color: #333 !important;
 }
 
-/* Geri oku sadece mobilde, çarpı sadece masaüstünde */
+.user-detail-close {
+  border: none;
+  background: transparent;
+  padding: 4px;
+  font-size: 18px;
+  color: #aaa;
+  cursor: pointer;
+  display: flex;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.user-detail-close:hover {
+  background: #e3ebe5;
+  color: #555;
+}
+
 .user-detail-back {
   display: none;
 }
@@ -40,6 +62,12 @@
   align-items: center;
   padding: 24px 20px;
   border-bottom: 1px solid #e8e8f0;
+}
+
+.user-detail-avatar {
+  background: var(--color-primary) !important;
+  font-size: 34px !important;
+  font-weight: 600;
 }
 
 .user-detail-name {
@@ -55,17 +83,40 @@
   text-align: center;
 }
 
+.user-detail-username {
+  font-size: 13px !important;
+  color: #999 !important;
+}
+
 .user-detail-status {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+.user-detail-status-skeleton {
+  margin-top: 6px;
 }
 
 .user-detail-status-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+  background: #c0c0c0;
+}
+
+.user-detail-status-dot.is-online {
+  background: #52c41a;
+}
+
+.user-detail-status-text {
+  font-size: 13px !important;
+  color: #aaa !important;
+}
+
+.user-detail-status-text.is-online {
+  color: var(--color-primary) !important;
 }
 
 .user-detail-bio {
@@ -74,12 +125,23 @@
   font-size: 14px;
   color: #888;
   line-height: 1.6;
+  word-break: break-word;
 }
 
 .user-detail-collapse {
   background: transparent !important;
   border: none !important;
   padding: 8px;
+}
+
+.user-detail-collapse-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-detail-collapse-icon {
+  color: var(--color-primary);
 }
 
 .user-detail-about-box {
@@ -92,6 +154,10 @@
   padding: 10px 16px;
   border-bottom: 1px solid #f1f5f2;
   overflow: hidden;
+}
+
+.user-detail-about-item:last-child {
+  border-bottom: none;
 }
 
 .user-detail-about-label {
@@ -109,7 +175,10 @@
   display: block !important;
 }
 
-/* Tablet / mobil: tam ekran ayrı sayfa gibi */
+.user-detail-actions {
+  padding: 8px 16px 20px;
+}
+
 @media (max-width: 900px) {
   .user-detail-panel {
     position: absolute;

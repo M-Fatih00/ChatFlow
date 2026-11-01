@@ -1,0 +1,12 @@
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/.vite
+**/.env
+**/.env.*
+!**/.env.production
+.git
+.vs
+.vscode
+.idea

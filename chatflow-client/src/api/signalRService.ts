@@ -18,17 +18,15 @@ class SignalRService {
   private connection: signalR.HubConnection | null = null;
   private offlineTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
-  async connect(token: string) {
-    if (this.connection) return; // zaten bağlantı varsa tekrar kurma
+  async connect() {
+    if (this.connection) return;
 
     const apiBase =
       import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5017/api";
     const hubUrl = apiBase.replace(/\/api\/?$/, "") + "/hubs/chat";
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, {
-        accessTokenFactory: () => token,
-      })
+      .withUrl(hubUrl, { withCredentials: true })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
       .build();
@@ -49,12 +47,10 @@ class SignalRService {
       const currentUserId = store.getState().auth.user?.id;
       store.dispatch(messageReceived({ ...message, currentUserId }));
 
-      // Bana gelen mesajsa (ben göndermediysem) iletildi bilgisi gönder
       if (message.senderId !== currentUserId) {
         this.markAsDelivered(message.id, message.senderId);
       }
 
-      // ChatsPanel yenilensin (yeni sohbet listeye eklenebilir)
       window.dispatchEvent(
         new CustomEvent("messageReceived", {
           detail: { isRoom: message.roomId != null },
@@ -83,7 +79,6 @@ class SignalRService {
       "UserTyping",
       (userId: string, roomId: number | null) => {
         const state = store.getState().chat;
-        // Bu typing benim açık sohbetime mi ait?
         const belongsToActive = state.isRoom
           ? roomId === Number(state.activeConversationId)
           : roomId == null && userId === state.activeConversationId;
@@ -150,11 +145,10 @@ class SignalRService {
     });
 
     this.connection.on("AddedToRoom", async (roomId: number) => {
-      // SignalR grubuna ANINDA katıl (hangi panelde olursak olalım)
       await this.joinRoom(roomId);
-      // Panellerin listeyi yenilemesi için event de fırlat
       window.dispatchEvent(new CustomEvent("addedToRoom", { detail: roomId }));
     });
+
     this.connection.on("OnlineUsersList", (userIds: string[]) => {
       userIds.forEach((id) => store.dispatch(userOnline(id)));
     });
@@ -196,13 +190,7 @@ class SignalRService {
     });
   }
 
-  async sendMessage(
-    content: string,
-    recipientId?: string,
-    roomId?: number,
-    attachmentUrl?: string,
-    attachmentType?: string,
-  ) {
+  private async waitForConnection(): Promise<boolean> {
     let attempts = 0;
     while (
       this.connection?.state !== signalR.HubConnectionState.Connected &&
@@ -211,9 +199,18 @@ class SignalRService {
       await new Promise((resolve) => setTimeout(resolve, 100));
       attempts++;
     }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
+    return this.connection?.state === signalR.HubConnectionState.Connected;
+  }
 
-    await this.connection.invoke(
+  async sendMessage(
+    content: string,
+    recipientId?: string,
+    roomId?: number,
+    attachmentUrl?: string,
+    attachmentType?: string,
+  ) {
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke(
       "SendMessage",
       content,
       recipientId ?? null,
@@ -224,29 +221,13 @@ class SignalRService {
   }
 
   async toggleReaction(messageId: number, emoji: string) {
-    let attempts = 0;
-    while (
-      this.connection?.state !== signalR.HubConnectionState.Connected &&
-      attempts < 50
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      attempts++;
-    }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
-    await this.connection.invoke("ToggleReaction", messageId, emoji);
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke("ToggleReaction", messageId, emoji);
   }
 
   async joinRoom(roomId: number) {
-    let attempts = 0;
-    while (
-      this.connection?.state !== signalR.HubConnectionState.Connected &&
-      attempts < 50
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      attempts++;
-    }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
-    await this.connection.invoke("JoinRoom", roomId);
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke("JoinRoom", roomId);
   }
 
   async leaveRoom(roomId: number) {
@@ -271,49 +252,26 @@ class SignalRService {
   }
 
   async markAsRead(messageId: number, senderId: string) {
-    let attempts = 0;
-    while (
-      this.connection?.state !== signalR.HubConnectionState.Connected &&
-      attempts < 50
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      attempts++;
-    }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
-    await this.connection.invoke("MarkAsRead", messageId, senderId);
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke("MarkAsRead", messageId, senderId);
   }
 
   async markAsDelivered(messageId: number, senderId: string) {
-    let attempts = 0;
-    while (
-      this.connection?.state !== signalR.HubConnectionState.Connected &&
-      attempts < 50
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      attempts++;
-    }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
-    await this.connection.invoke("MarkAsDelivered", messageId, senderId);
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke("MarkAsDelivered", messageId, senderId);
   }
 
   async deleteMessage(messageId: number) {
-    let attempts = 0;
-    while (
-      this.connection?.state !== signalR.HubConnectionState.Connected &&
-      attempts < 50
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      attempts++;
-    }
-    if (this.connection?.state !== signalR.HubConnectionState.Connected) return;
-    await this.connection.invoke("DeleteMessage", messageId);
+    if (!(await this.waitForConnection())) return;
+    await this.connection!.invoke("DeleteMessage", messageId);
   }
 
   async disconnect() {
+    this.offlineTimers.forEach((timer) => clearTimeout(timer));
+    this.offlineTimers.clear();
     await this.connection?.stop();
     this.connection = null;
   }
 }
 
-// Singleton — tek bir instance kullanacağız
 export const signalRService = new SignalRService();
